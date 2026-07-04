@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通用模擬直播介面系統 (MV 拍攝專用道具)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            overflow-x: hidden;
+        }
+
+        /* 隱藏滾動條但保留滾動功能 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 讓留言滾動向上時，在頂部產生羽化漸層淡出效果 */
+        #commentsWrapper {
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 18%);
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 18%);
+        }
+
+        /* 定義動態留言文字尺寸專用 CSS 變數 */
+        #commentsContainer {
+            --comment-font-size: 11.5px;
+            --comment-name-size: 11px;
+        }
+
+        .comment-text-size {
+            font-size: var(--comment-font-size);
+        }
+
+        .comment-name-size {
+            font-size: var(--comment-name-size);
+        }
+
+        /* 漂浮表情動畫 */
+        @keyframes floatReaction {
+            0% {
+                transform: translateY(0) translateX(0) scale(0.6);
+                opacity: 0;
+            }
+            15% {
+                opacity: 0.95;
+                transform: translateY(-40px) translateX(var(--x-mid)) scale(1.1);
+            }
+            100% {
+                transform: translateY(-450px) translateX(var(--x-end)) scale(0.85);
+                opacity: 0;
+            }
+        }
+
+        .floating-emoji {
+            position: absolute;
+            bottom: 60px;
+            right: 20px;
+            animation: floatReaction var(--duration) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            pointer-events: none;
+            user-select: none;
+            z-index: 40;
+        }
+
+        /* 虛擬框線呼吸效果 */
+        .drag-active {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- 左側：直播模擬畫面區 -->
+    <div class="flex-1 flex items-center justify-center bg-black relative p-2 md:p-6" id="liveContainerParent">
+        
+        <!-- 劇組主視角：模擬直播顯示器 -->
+        <div id="liveViewport" class="relative bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-300 aspect-[9/16] h-[92vh] max-w-full">
+            
+            <!-- 1. 拖曳影片空白容器 -->
+            <div id="dropZone" class="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 border-4 border-dashed border-neutral-700 bg-neutral-900 bg-opacity-95 transition-all text-center">
+                <div class="w-20 h-20 rounded-full bg-neutral-800 flex items-center justify-center mb-4 text-neutral-400">
+                    <span class="material-icons text-5xl">movie</span>
+                </div>
+                <h3 class="text-xl font-bold mb-2">拖曳影片至此處播放</h3>
+                <p class="text-neutral-500 text-sm max-w-xs mb-4">支援 MP4, WebM 等常見影片格式。此處為空白容器，不含任何侵權商標。</p>
+                <label class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold cursor-pointer transition">
+                    選擇電腦中的影片
+                    <input type="file" id="videoFileInput" accept="video/*" class="hidden">
+                </label>
+            </div>
+
+            <!-- 2. 底層影片播放器 -->
+            <video id="mainVideo" class="w-full h-full object-cover pointer-events-none" loop playsinline muted></video>
+
+            <!-- 3. 用於錄影導出的隱藏 Canvas -->
+            <canvas id="exportCanvas" class="hidden"></canvas>
+
+            <!-- 4. 頂層 直播 UI 疊加層 (Glassmorphism 質感) -->
+            <div id="liveUI" class="absolute inset-0 z-20 flex flex-col justify-between p-4 pointer-events-none select-none transition-opacity duration-300">
+                
+                <!-- 頂部資訊列 (帳號與在線人數) -->
+                <div class="flex items-start justify-between w-full pt-2">
+                    <div class="flex items-center space-x-3 bg-black bg-opacity-40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white border-opacity-10">
+                        <!-- 頭貼 -->
+                        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center font-black text-white text-sm shadow">
+                            O
+                        </div>
+                        <!-- 帳號資訊 -->
+                        <div>
+                            <div class="flex items-center space-x-1">
+                                <span class="font-bold text-sm tracking-wide text-white drop-shadow" id="uiAccountName">obsess</span>
+                                <!-- 官方認證勾勾 (非FB樣式，通用圓形徽章) -->
+                                <span class="material-icons text-blue-400 text-xs bg-white rounded-full p-0.5" style="font-size: 10px; font-weight: 900;">check</span>
+                            </div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                <span class="text-[10px] text-gray-200 uppercase tracking-widest font-semibold">LIVE</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右側在線人數與關閉按鈕 -->
+                    <div class="flex items-center space-x-2">
+                        <div class="bg-red-600 px-2.5 py-1 rounded-md text-[11px] font-black tracking-wider text-white shadow flex items-center space-x-1">
+                            <span class="material-icons text-xs">sensors</span>
+                            <span>直播中</span>
+                        </div>
+                        <div class="bg-black bg-opacity-40 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] font-bold text-white border border-white border-opacity-10 flex items-center space-x-1">
+                            <span class="material-icons text-xs text-gray-300">visibility</span>
+                            <span id="uiViewerCount">14,832</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中間偏右：直播倒讚發送區動畫 (飄起) -->
+                <div id="reactionsContainer" class="absolute inset-0 pointer-events-none overflow-hidden">
+                    <!-- 動態表情由此生成 -->
+                </div>
+
+                <!-- 底部：留言區與互動功能 (極致精簡靠左配置) -->
+                <div class="w-full flex flex-col space-y-2.5 pb-1">
+                    <!-- 底部：留言區與互動功能 (極致精簡靠左配置) -->
+                    <div class="w-full flex flex-col space-y-2.5 pb-1">
+                        <!-- 酸民留言板 (縮小尺寸、靠左，羽化漸變消失) -->
+                        <div class="w-[85%] max-w-[280px] max-h-[32vh] overflow-y-auto no-scrollbar flex flex-col space-y-1.5" id="commentsWrapper">
+                            <div class="flex flex-col space-y-1.5 pb-2" id="commentsContainer">
+                                <!-- 留言動態插入 -->
+                            </div>
+                        </div>
+
+                        <!-- 底部虛擬輸入框 (緊湊化) -->
+                        <div class="flex items-center justify-between w-full bg-black bg-opacity-35 backdrop-blur-md rounded-full px-3.5 py-1.5 border border-white border-opacity-10">
+                            <div class="flex items-center space-x-2 text-gray-300 text-[11px]">
+                                <span class="material-icons text-sm text-gray-400">chat_bubble_outline</span>
+                                <span>與 </span><span class="font-bold text-white">obsess</span><span> 互動...</span>
+                            </div>
+                            <div class="flex items-center space-x-2.5 text-gray-300">
+                                <span class="material-icons text-base hover:text-white transition">sentiment_very_dissatisfied</span>
+                                <!-- 將倒讚圖示啟用滑鼠與觸控事件，隱形連結至控制台開關 -->
+                                <span id="dislikeToggleBtn" class="material-icons text-base text-red-500 animate-bounce pointer-events-auto cursor-pointer" title="隱藏/顯示導演主控台">thumb_down</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側：導演主控台面板 (Director Panel) -->
+    <div id="directorPanel" class="w-full md:w-[420px] bg-neutral-900 border-l border-neutral-800 flex flex-col h-full overflow-y-auto no-scrollbar p-6 space-y-6 transition-all duration-300 relative z-50 shrink-0">
+        
+        <!-- 控制台標頭 -->
+        <div class="flex items-center justify-between border-b border-neutral-800 pb-4">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                    <span class="material-icons text-blue-500">videocam</span>
+                    <span>導演主控台 (道具控制)</span>
+                </h2>
+                <p class="text-xs text-neutral-400 mt-0.5">快捷鍵 <kbd class="px-1.5 py-0.5 bg-neutral-800 rounded text-blue-400 font-mono">H</kbd> 可快速隱藏此面板</p>
+            </div>
+            <button id="hidePanelBtn" class="p-1.5 hover:bg-neutral-800 rounded-lg text-neutral-400 hover:text-white transition" title="隱藏控制台">
+                <span class="material-icons">chevron_left</span>
+            </button>
+        </div>
+
+        <!-- 影片狀態控制 -->
+        <div class="bg-neutral-950 p-4 rounded-xl border border-neutral-800 space-y-3">
+            <h3 class="text-xs font-bold text-neutral-400 uppercase tracking-wider">影片狀態</h3>
+            <div class="flex items-center space-x-2">
+                <button id="btnPlay" class="flex-1 flex items-center justify-center space-x-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition">
+                    <span class="material-icons text-lg" id="playIcon">play_arrow</span>
+                    <span id="playText">播放影片</span>
+                </button>
+                <button id="btnMute" class="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition" title="靜音">
+                    <span class="material-icons text-lg" id="muteIcon">volume_off</span>
+                </button>
+                <button id="btnReload" class="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition" title="重新載入">
+                    <span class="material-icons text-lg">replay</span>
+                </button>
+            </div>
+            <div id="videoMeta" class="text-xs text-neutral-500 flex justify-between">
+                <span>尚未載入影片</span>
+                <span id="videoDuration">00:00</span>
+            </div>
+        </div>
+
+        <!-- 畫面格式調整 -->
+        <div class="space-y-3">
+            <h3 class="text-xs font-bold text-neutral-400 uppercase tracking-wider">畫面比例切換</h3>
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="changeAspect('9/16', 'h-[92vh] aspect-[9/16]')" class="aspect-btn active py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex flex-col items-center space-y-1 transition border border-transparent">
+                    <span class="material-icons text-lg">stay_current_portrait</span>
+                    <span>手機直式 (9:16)</span>
+                </button>
+                <button onclick="changeAspect('16/9', 'w-[95%] aspect-[16/9] h-auto')" class="aspect-btn py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-semibold flex flex-col items-center space-y-1 transition border border-transparent">
+                    <span class="material-icons text-lg">desktop_windows</span>
+                    <span>寬螢幕 (16:9)</span>
+                </button>
+                <button onclick="changeAspect('1/1', 'h-[80vh] aspect-[1/1]')" class="aspect-btn py-2.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-semibold flex flex-col items-center space-y-1 transition border border-transparent">
+                    <span class="material-icons text-lg">crop_square</span>
+                    <span>正方形 (1:1)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 導出錄影功能 -->
+        <div class="bg-blue-950 bg-opacity-30 border border-blue-900 border-opacity-50 p-4 rounded-xl space-y-3">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider">高畫質影片錄製與輸出</h3>
+                <span class="inline-flex h-2 w-2 rounded-full bg-gray-400" id="recIndicator"></span>
+            </div>
+            <p class="text-xs text-neutral-400 leading-relaxed">
+                此功能會將拖曳的影片與<b>倒讚表情流、實時留言</b>直接合成為一個新的影片檔案，供後期剪輯使用。
+            </p>
+            <div class="flex space-x-2">
+                <button id="btnStartRec" class="flex-1 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition disabled:opacity-50">
+                    <span class="material-icons text-sm">radio_button_checked</span>
+                    <span>開始錄製</span>
+                </button>
+                <button id="btnStopRec" disabled class="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center space-x-1 transition disabled:opacity-50">
+                    <span class="material-icons text-sm">download</span>
+                    <span>結束並導出</span>
+                </button>
+            </div>
+            <div id="recStatus" class="text-center text-[11px] text-neutral-500">尚未錄製</div>
+        </div>
+
+        <!-- 直播參數與控制 -->
+        <div class="space-y-4">
+            <h3 class="text-xs font-bold text-neutral-400 uppercase tracking-wider border-b border-neutral-800 pb-1">直播參數調整</h3>
+            
+            <!-- 帳號與在線人數修改 -->
+            <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="text-xs text-neutral-400">直播帳號名稱</label>
+                    <input type="text" id="inputAccountName" value="obsess" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs text-neutral-400">模擬觀看人數</label>
+                    <input type="number" id="inputViewerCount" value="14832" class="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+
+            <!-- UI 元素隱藏切換 -->
+            <div class="space-y-2">
+                <span class="text-xs text-neutral-400 block">道具介面開關 (拍特寫用)</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center space-x-2 bg-neutral-800 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-700 transition">
+                        <input type="checkbox" id="toggleComments" checked class="rounded border-neutral-600 bg-neutral-700 text-blue-600 focus:ring-0 focus:ring-offset-0">
+                        <span class="text-xs text-neutral-300">顯示酸民留言</span>
+                    </label>
+                    <label class="flex items-center space-x-2 bg-neutral-800 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-700 transition">
+                        <input type="checkbox" id="toggleReactions" checked class="rounded border-neutral-600 bg-neutral-700 text-blue-600 focus:ring-0 focus:ring-offset-0">
+                        <span class="text-xs text-neutral-300">顯示倒讚飄浮</span>
+                    </label>
+                    <label class="flex items-center space-x-2 bg-neutral-800 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-700 transition">
+                        <input type="checkbox" id="toggleTopBar" checked class="rounded border-neutral-600 bg-neutral-700 text-blue-600 focus:ring-0 focus:ring-offset-0">
+                        <span class="text-xs text-neutral-300">顯示上方資訊</span>
+                    </label>
+                    <label class="flex items-center space-x-2 bg-neutral-800 px-3 py-2 rounded-lg cursor-pointer hover:bg-neutral-700 transition">
+                        <input type="checkbox" id="toggleInputBar" checked class="rounded border-neutral-600 bg-neutral-700 text-blue-600 focus:ring-0 focus:ring-offset-0">
+                        <span class="text-xs text-neutral-300">顯示底部輸入</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 酸民留言尺寸調整 -->
+            <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs text-neutral-400">酸民留言文字尺寸</label>
+                    <span id="commentSizeLabel" class="text-xs font-semibold text-blue-400">11.5px</span>
+                </div>
+                <input type="range" id="commentSizeRange" min="9" max="22" step="0.5" value="11.5" class="w-full accent-blue-500">
+            </div>
+
+            <!-- 酸民留言發送頻率 -->
+            <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs text-neutral-400">酸民留言洗版速度</label>
+                    <span id="commentSpeedLabel" class="text-xs font-semibold text-blue-400">中等</span>
+                </div>
+                <input type="range" id="commentSpeedRange" min="0" max="4" value="2" class="w-full accent-blue-500">
+            </div>
+
+            <!-- 倒讚漂浮頻率 -->
+            <div class="space-y-1">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs text-neutral-400">倒讚爆發頻率</label>
+                    <span id="dislikeSpeedLabel" class="text-xs font-semibold text-blue-400">中等</span>
+                </div>
+                <input type="range" id="dislikeSpeedRange" min="0" max="4" value="2" class="w-full accent-blue-500">
+            </div>
+        </div>
+
+        <!-- 即時酸民文字干預 (配合拍MV特寫) -->
+        <div class="space-y-3 bg-red-950 bg-opacity-20 border border-red-900 border-opacity-30 p-4 rounded-xl">
+            <h3 class="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center space-x-1.5">
+                <span class="material-icons text-sm">gavel</span>
+                <span>導演手動操控言論 (特寫運鏡)</span>
+            </h3>
+            <p class="text-xs text-neutral-400">在此輸入特定字串，點擊發送將會在直播中立刻跳出該條「加粗高亮」的置頂留言，便於特寫鏡頭拍攝。</p>
+            <div class="flex space-x-2">
+                <input type="text" id="customCommentInput" placeholder="例如：這主唱在唱三小啦..." class="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500">
+                <button id="btnSendCustomComment" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition">
+                    立即發送
+                </button>
+            </div>
+        </div>
+
+        <!-- 下載說明 -->
+        <div class="text-[11px] text-neutral-500 space-y-1 text-center border-t border-neutral-800 pt-4">
+            <p>© 2026 模擬直播道具系統 · 專為MV拍攝打造</p>
+            <p>無任何第三方版權疑慮 · 永久免費使用</p>
+        </div>
+
+    </div>
+
+    <!-- 腳本邏輯 -->
+    <script>
+        // --- 1. 酸民語庫 (專屬負面抱怨、批判與生氣表情符號) ---
+        const haterComments = [
+            "這唱的到底是什麼鬼東西？🙄",
+            "超難聽，浪費我時間...",
+            "這年頭什麼人都可以出來開直播？",
+            "退票啦！根本詐騙！",
+            "主唱是不是走音了啊？還是原本就沒音準？",
+            "笑死，這素質也敢自稱音樂人？",
+            "還我門票錢 🤬",
+            "這首歌是抄襲的吧？聽起來超耳熟",
+            "完全沒有靈魂的表演，下去好嗎？",
+            "可以下台了嗎？尷尬癌要犯了",
+            "耳朵流血了，誰來救救我 🩸",
+            "這編曲到底是誰做的？真夠差",
+            "完全是在假唱吧？對嘴很明顯喔！",
+            "跟CD差太多了吧，現場根本車禍現場",
+            "👎👎👎👎👎👎👎👎",
+            "😡😡😡😡 氣死，這什麼爛音質",
+            "別唱了，回去練個十年再來好嗎？",
+            "這根本是環境噪音污染...",
+            "主唱今天狀態超差，還是實力本來就這樣？",
+            "只有我覺得很難聽嗎？",
+            "路過，真心覺得不行，浪費才能",
+            "這也配叫搖滾？不要污辱音樂",
+            "真的是失望透頂...",
+            "還是趕快解散算了，別出來丟人現眼",
+            "這到底是三小？看不懂",
+            "難怪票賣不完，笑死 🤣",
+            "可以把主唱的麥克風關掉嗎？",
+            "好敷衍的表演，真把粉絲當韭菜",
+            "不要再刷存在感了",
+            "看一分鐘就受不了了，閃人 🖕",
+            "完全不知道在唱什麼，是在念經？",
+            "歌聲像在刮鐵皮，超刺耳"
+        ];
+
+        // 隨機酸民使用者名稱
+        const haterUsernames = [
+            "不爽不要看", "音樂糾察隊", "耳膜受害者", "鍵盤樂評家", "路人甲3號", "正義魔人", 
+            "退票大使", "暴怒吉他手", "現場破音檢測器", "誠實豆沙包", "只想說實話", "聽不下去的人", 
+            "音樂素養大師", "倒讚專業戶", "匿名酸民99", "真話守護者", "別再唱了拜託"
+        ];
+
+        // 圖片快取地圖 (預防 Canvas 導出時重複載入跨域頭像引發卡頓或安全報錯)
+        const avatarImageCache = {};
+
+        function getAvatarImage(url) {
+            if (avatarImageCache[url]) {
+                return avatarImageCache[url];
+            }
+            const img = new Image();
+            img.crossOrigin = "anonymous"; // 重要：避免 Tainted Canvas 導致錄影報錯
+            img.src = url;
+            avatarImageCache[url] = img;
+            return img;
+        }
+
+        // --- 2. 全域狀態與變數 ---
+        let currentIntervals = { comments: null, reactions: null };
+        let activeComments = []; // 儲存目前顯示在 UI 上的留言
+        let commentsIdCounter = 0;
+        let isMuted = true;
+        let isRecording = false;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let canvasRenderLoopId = null;
+
+        // 取得 DOM 節點
+        const mainVideo = document.getElementById('mainVideo');
+        const dropZone = document.getElementById('dropZone');
+        const videoFileInput = document.getElementById('videoFileInput');
+        const liveViewport = document.getElementById('liveViewport');
+        const commentsContainer = document.getElementById('commentsContainer');
+        const commentsWrapper = document.getElementById('commentsWrapper');
+        const reactionsContainer = document.getElementById('reactionsContainer');
+        const directorPanel = document.getElementById('directorPanel');
+        const dislikeToggleBtn = document.getElementById('dislikeToggleBtn');
+        const hidePanelBtn = document.getElementById('hidePanelBtn');
+
+        // 控制台欄位
+        const inputAccountName = document.getElementById('inputAccountName');
+        const inputViewerCount = document.getElementById('inputViewerCount');
+        const uiAccountName = document.getElementById('uiAccountName');
+        const uiViewerCount = document.getElementById('uiViewerCount');
+
+        const toggleComments = document.getElementById('toggleComments');
+        const toggleReactions = document.getElementById('toggleReactions');
+        const toggleTopBar = document.getElementById('toggleTopBar');
+        const toggleInputBar = document.getElementById('toggleInputBar');
+
+        const commentSizeRange = document.getElementById('commentSizeRange');
+        const commentSizeLabel = document.getElementById('commentSizeLabel');
+        const commentSpeedRange = document.getElementById('commentSpeedRange');
+        const commentSpeedLabel = document.getElementById('commentSpeedLabel');
+        const dislikeSpeedRange = document.getElementById('dislikeSpeedRange');
+        const dislikeSpeedLabel = document.getElementById('dislikeSpeedLabel');
+
+        const customCommentInput = document.getElementById('customCommentInput');
+        const btnSendCustomComment = document.getElementById('btnSendCustomComment');
+
+        // 影片控制按鈕
+        const btnPlay = document.getElementById('btnPlay');
+        const btnMute = document.getElementById('btnMute');
+        const btnReload = document.getElementById('btnReload');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const muteIcon = document.getElementById('muteIcon');
+        const videoMeta = document.getElementById('videoMeta');
+        const videoDuration = document.getElementById('videoDuration');
+
+        // 錄影按鈕
+        const btnStartRec = document.getElementById('btnStartRec');
+        const btnStopRec = document.getElementById('btnStopRec');
+        const recStatus = document.getElementById('recStatus');
+        const recIndicator = document.getElementById('recIndicator');
+
+        // --- 3. 拖曳影片載入功能 ---
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-active'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleVideoFile(files[0]);
+            }
+        });
+
+        videoFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleVideoFile(e.target.files[0]);
+            }
+        });
+
+        function handleVideoFile(file) {
+            if (!file.type.startsWith('video/')) {
+                alert('請上傳有效的影片檔案！');
+                return;
+            }
+            const fileURL = URL.createObjectURL(file);
+            mainVideo.src = fileURL;
+            mainVideo.load();
+            mainVideo.play().then(() => {
+                updatePlayState(true);
+            }).catch(() => {
+                updatePlayState(false);
+            });
+            dropZone.classList.add('hidden');
+            videoMeta.innerHTML = `<span class="truncate max-w-[200px] inline-block">${file.name}</span>`;
+        }
+
+        // 影片載入時間長度更新
+        mainVideo.addEventListener('loadedmetadata', () => {
+            const mins = Math.floor(mainVideo.duration / 60).toString().padStart(2, '0');
+            const secs = Math.floor(mainVideo.duration % 60).toString().padStart(2, '0');
+            videoDuration.textContent = `${mins}:${secs}`;
+        });
+
+        // --- 4. 影片狀態控制事件 ---
+        btnPlay.addEventListener('click', () => {
+            if (mainVideo.paused) {
+                mainVideo.play();
+                updatePlayState(true);
+            } else {
+                mainVideo.pause();
+                updatePlayState(false);
+            }
+        });
+
+        function updatePlayState(isPlaying) {
+            if (isPlaying) {
+                playIcon.textContent = 'pause';
+                playText.textContent = '暫停播放';
+            } else {
+                playIcon.textContent = 'play_arrow';
+                playText.textContent = '播放影片';
+            }
+        }
+
+        btnMute.addEventListener('click', () => {
+            isMuted = !isMuted;
+            mainVideo.muted = isMuted;
+            muteIcon.textContent = isMuted ? 'volume_off' : 'volume_up';
+            btnMute.className = isMuted 
+                ? 'px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition' 
+                : 'px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition';
+        });
+
+        btnReload.addEventListener('click', () => {
+            mainVideo.currentTime = 0;
+            mainVideo.play();
+            updatePlayState(true);
+        });
+
+        // --- 5. 直播參數同步更新 ---
+        inputAccountName.addEventListener('input', () => {
+            uiAccountName.textContent = inputAccountName.value || 'obsess';
+        });
+
+        inputViewerCount.addEventListener('input', () => {
+            const count = parseInt(inputViewerCount.value) || 0;
+            uiViewerCount.textContent = count.toLocaleString();
+        });
+
+        // 介面各元素開關控制
+        toggleComments.addEventListener('change', (e) => {
+            document.getElementById('commentsWrapper').style.opacity = e.target.checked ? '1' : '0';
+        });
+        toggleReactions.addEventListener('change', (e) => {
+            reactionsContainer.style.opacity = e.target.checked ? '1' : '0';
+        });
+        toggleTopBar.addEventListener('change', (e) => {
+            document.querySelector('#liveUI > div:first-child').style.opacity = e.target.checked ? '1' : '0';
+        });
+        toggleInputBar.addEventListener('change', (e) => {
+            document.querySelector('#liveUI > div:last-child').style.opacity = e.target.checked ? '1' : '0';
+        });
+
+        // 留言尺寸動態縮放監聽與執行
+        function updateCommentSize() {
+            const size = commentSizeRange.value;
+            commentSizeLabel.textContent = `${size}px`;
+            // 透過修改 CSS Variables，網頁畫面上新舊留言會同步即時放大縮小
+            commentsContainer.style.setProperty('--comment-font-size', `${size}px`);
+            commentsContainer.style.setProperty('--comment-name-size', `${parseFloat(size) - 0.5}px`);
+        }
+        commentSizeRange.addEventListener('input', updateCommentSize);
+
+        // --- 6. 酸民留言洗版引擎 ---
+        const commentSpeeds = [0, 2000, 1000, 500, 150]; // 毫秒/次
+        const commentSpeedLabels = ["關閉", "緩慢", "中等", "快速", "爆走"];
+
+        function getCommentInterval() {
+            const val = parseInt(commentSpeedRange.value);
+            commentSpeedLabel.textContent = commentSpeedLabels[val];
+            return commentSpeeds[val];
+        }
+
+        function restartCommentEngine() {
+            if (currentIntervals.comments) {
+                clearInterval(currentIntervals.comments);
+                currentIntervals.comments = null;
+            }
+            const interval = getCommentInterval();
+            if (interval > 0) {
+                currentIntervals.comments = setInterval(() => {
+                    spawnComment();
+                }, interval);
+            }
+        }
+
+        commentSpeedRange.addEventListener('input', restartCommentEngine);
+
+        function spawnComment(customText = null, isCustomHighlight = false) {
+            const username = haterUsernames[Math.floor(Math.random() * haterUsernames.length)];
+            const text = customText || haterComments[Math.floor(Math.random() * haterComments.length)];
+            
+            // 【全新優化】使用 Lorem Picsum 全球免費隨機圖庫 API (完美支援 CORS、絕不會造成導出影片頭像空白)
+            const randomId = Math.floor(Math.random() * 800);
+            const avatarUrl = `https://picsum.photos/80?random=${randomId}`;
+
+            const commentObj = {
+                id: commentsIdCounter++,
+                username: username,
+                text: text,
+                avatarUrl: avatarUrl,
+                isHighlight: isCustomHighlight,
+                timestamp: Date.now()
+            };
+
+            activeComments.push(commentObj);
+            if (activeComments.length > 50) {
+                activeComments.shift(); // 限制內存上限
+            }
+
+            // 渲染 DOM
+            const commentEl = document.createElement('div');
+            commentEl.className = `flex items-start space-x-2 max-w-full transform translate-y-2 opacity-0 transition-all duration-300 ${isCustomHighlight ? 'bg-red-500 bg-opacity-20 border-l-2 border-red-500 py-0.5 pl-1 rounded-r-md' : ''}`;
+            commentEl.setAttribute('data-id', commentObj.id);
+
+            // 為 <img> 加入 crossorigin="anonymous" 保障快取機制
+            commentEl.innerHTML = `
+                <img src="${avatarUrl}" crossorigin="anonymous" class="w-7 h-7 rounded-full object-cover shrink-0 shadow-lg border border-white border-opacity-10" alt="avatar" onerror="this.src='https://cdn-icons-png.flaticon.com/512/847/847969.png'">
+                <div class="flex-1 px-1 py-0.5">
+                    <span class="font-bold text-blue-300 hover:underline cursor-pointer block leading-none mb-0.5 comment-name-size" style="text-shadow: 0px 1px 3px rgba(0,0,0,0.9), 0px 1px 5px rgba(0,0,0,1);">${username}</span>
+                    <span class="text-gray-100 break-all leading-tight comment-text-size ${isCustomHighlight ? 'font-black text-red-400' : ''}" style="text-shadow: 0px 1px 3px rgba(0,0,0,0.9), 0px 1px 5px rgba(0,0,0,1);">${text}</span>
+                </div>
+            `;
+
+            commentsContainer.appendChild(commentEl);
+            
+            // 觸發進場動畫
+            setTimeout(() => {
+                commentEl.classList.remove('translate-y-2', 'opacity-0');
+                // 自動滾動到底部
+                commentsWrapper.scrollTo({
+                    top: commentsWrapper.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 10);
+
+            // 清理過舊的 DOM (維持畫面高度與效能)
+            while (commentsContainer.children.length > 15) {
+                commentsContainer.removeChild(commentsContainer.firstChild);
+            }
+        }
+
+        // --- 7. 即時導演言論干預送出 ---
+        btnSendCustomComment.addEventListener('click', () => {
+            const text = customCommentInput.value.trim();
+            if (text) {
+                spawnComment(text, true);
+                customCommentInput.value = '';
+            }
+        });
+
+        customCommentInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                btnSendCustomComment.click();
+            }
+        });
+
+        // --- 8. 倒讚表情飄浮飄動引擎 ---
+        const dislikeSpeeds = [0, 1500, 800, 300, 80]; // 毫秒/次
+        const dislikeSpeedLabels = ["關閉", "稀疏", "中等", "頻繁", "暴動"];
+        const reactionsPool = ["👎", "😡", "💩", "💔", "👎", "😡"]; 
+
+        function getDislikeInterval() {
+            const val = parseInt(dislikeSpeedRange.value);
+            dislikeSpeedLabel.textContent = dislikeSpeedLabels[val];
+            return dislikeSpeeds[val];
+        }
+
+        function restartDislikeEngine() {
+            if (currentIntervals.reactions) {
+                clearInterval(currentIntervals.reactions);
+                currentIntervals.reactions = null;
+            }
+            const interval = getDislikeInterval();
+            if (interval > 0) {
+                currentIntervals.reactions = setInterval(() => {
+                    spawnReaction();
+                }, interval);
+            }
+        }
+
+        dislikeSpeedRange.addEventListener('input', restartDislikeEngine);
+
+        // 管理當前畫面上飄浮的表情數據
+        let activeReactions = [];
+
+        function spawnReaction() {
+            if (!toggleReactions.checked) return;
+
+            const emoji = reactionsPool[Math.floor(Math.random() * reactionsPool.length)];
+            const duration = 3 + Math.random() * 2; // 3-5 秒
+            const xMid = -80 + Math.random() * 160;  
+            const xEnd = -150 + Math.random() * 300; 
+            const size = 18 + Math.random() * 14;     
+            
+            // 1. DOM 渲染 (供網頁即時預覽)
+            const el = document.createElement('div');
+            el.className = 'floating-emoji';
+            el.textContent = emoji;
+            el.style.fontSize = `${size}px`;
+            el.style.setProperty('--x-mid', `${xMid}px`);
+            el.style.setProperty('--x-end', `${xEnd}px`);
+            el.style.setProperty('--duration', `${duration}s`);
+
+            reactionsContainer.appendChild(el);
+
+            // 動畫結束後移除
+            setTimeout(() => {
+                if (el.parentNode === reactionsContainer) {
+                    reactionsContainer.removeChild(el);
+                }
+            }, duration * 1000);
+
+            // 2. 保存數據結構 (供錄影輸出 Canvas 計算位置用)
+            const reactionObj = {
+                emoji: emoji,
+                size: size,
+                startX: 0.85, 
+                startY: 0.90, 
+                xMid: xMid,
+                xEnd: xEnd,
+                duration: duration * 1000,
+                elapsed: 0,
+                createdAt: Date.now()
+            };
+            activeReactions.push(reactionObj);
+        }
+
+        // --- 9. 畫面比例切換函數 ---
+        function changeAspect(ratioText, classString) {
+            liveViewport.className = `relative bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-300 ${classString}`;
+            
+            // 更新切換按鈕狀態
+            document.querySelectorAll('.aspect-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-600', 'text-white');
+                btn.classList.add('bg-neutral-800', 'text-neutral-300');
+            });
+            event.currentTarget.classList.add('active', 'bg-blue-600', 'text-white');
+            event.currentTarget.classList.remove('bg-neutral-800', 'text-neutral-300');
+        }
+
+        // 一鍵隱藏/顯示控制面板
+        function toggleDirectorPanel() {
+            if (directorPanel.classList.contains('md:w-[420px]')) {
+                // 隱藏
+                directorPanel.classList.remove('md:w-[420px]', 'p-6');
+                directorPanel.classList.add('md:w-0', 'w-0', 'p-0', 'overflow-hidden', 'opacity-0', 'border-none');
+            } else {
+                // 顯示
+                directorPanel.classList.add('md:w-[420px]', 'p-6');
+                directorPanel.classList.remove('md:w-0', 'w-0', 'p-0', 'overflow-hidden', 'opacity-0', 'border-none');
+            }
+        }
+
+        hidePanelBtn.addEventListener('click', toggleDirectorPanel);
+        dislikeToggleBtn.addEventListener('click', toggleDirectorPanel);
+
+        // 鍵盤 H 隱藏快速鍵
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'h' && document.activeElement.tagName !== 'INPUT') {
+                toggleDirectorPanel();
+            }
+        });
+
+        // --- 10. 高畫質錄影與 UI 實時渲染合成引擎 (核心功能) ---
+        function startCanvasRenderLoop() {
+            const canvas = document.getElementById('exportCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // 確保導出畫面是銳利的高清像素
+            let outWidth = 1080;
+            let outHeight = 1920;
+
+            const is169 = liveViewport.classList.contains('aspect-[16/9]');
+            const is11 = liveViewport.classList.contains('aspect-[1/1]');
+
+            if (is169) {
+                outWidth = 1920;
+                outHeight = 1080;
+            } else if (is11) {
+                outWidth = 1080;
+                outHeight = 1080;
+            }
+
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+
+            function renderFrame() {
+                if (!isRecording) return;
+
+                // 1. 繪製底部主體影片 (等比縮放覆蓋)
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, outWidth, outHeight);
+
+                if (mainVideo.readyState >= 2) {
+                    const vW = mainVideo.videoWidth;
+                    const vH = mainVideo.videoHeight;
+                    const scale = Math.max(outWidth / vW, outHeight / vH);
+                    const drawW = vW * scale;
+                    const drawH = vH * scale;
+                    const drawX = (outWidth - drawW) / 2;
+                    const drawY = (outHeight - drawH) / 2;
+                    ctx.drawImage(mainVideo, drawX, drawY, drawW, drawH);
+                }
+
+                // 2. 漸變暗角陰影 (頂部與底部)
+                const topGrad = ctx.createLinearGradient(0, 0, 0, outHeight * 0.15);
+                topGrad.addColorStop(0, 'rgba(0, 0, 0, 0.6)');
+                topGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = topGrad;
+                ctx.fillRect(0, 0, outWidth, outHeight * 0.15);
+
+                const bottomGrad = ctx.createLinearGradient(0, outHeight * 0.5, 0, outHeight);
+                bottomGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                bottomGrad.addColorStop(1, 'rgba(0, 0, 0, 0.7)');
+                ctx.fillStyle = bottomGrad;
+                ctx.fillRect(0, outHeight * 0.5, outWidth, outHeight * 0.5);
+
+                // 計算動態縮放比率常數 (實體導出 Canvas 寬度 / HTML 預覽視窗寬度)，讓導出 UI 完美等比縮放
+                const viewWidth = liveViewport.clientWidth || 360;
+                const canvasScale = outWidth / viewWidth;
+
+                // --- 繪製頂部資訊欄 (套用 canvasScale) ---
+                if (toggleTopBar.checked) {
+                    const padding = outWidth * 0.04;
+                    const topY = outHeight * 0.04 + (30 * canvasScale);
+
+                    // 帳號氣泡背景
+                    ctx.save();
+                    ctx.beginPath();
+                    const pillH = 44 * canvasScale;
+                    const pillW = 180 * canvasScale;
+                    ctx.roundRect(padding, topY - (22 * canvasScale), pillW, pillH, 22 * canvasScale);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fill();
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.stroke();
+
+                    // 漸變頭像
+                    const avRadius = 15 * canvasScale;
+                    const avX = padding + (8 * canvasScale) + avRadius;
+                    const avY = topY;
+                    const avGrad = ctx.createLinearGradient(avX - avRadius, avY - avRadius, avX + avRadius, avY + avRadius);
+                    avGrad.addColorStop(0, '#a855f7');
+                    avGrad.addColorStop(1, '#ec4899');
+                    ctx.beginPath();
+                    ctx.arc(avX, avY, avRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = avGrad;
+                    ctx.fill();
+
+                    // 頭像文字 'O'
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `900 ${Math.round(14 * canvasScale)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('O', avX, avY);
+
+                    // 帳號與 LIVE
+                    ctx.textAlign = 'left';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${Math.round(12 * canvasScale)}px sans-serif`;
+                    ctx.fillText(inputAccountName.value || 'obsess', avX + avRadius + (8 * canvasScale), avY - (5 * canvasScale));
+
+                    // 官方認證勾勾
+                    const nameLen = ctx.measureText(inputAccountName.value || 'obsess').width;
+                    const checkX = avX + avRadius + (8 * canvasScale) + nameLen + (8 * canvasScale);
+                    ctx.beginPath();
+                    ctx.arc(checkX, avY - (9 * canvasScale), 5 * canvasScale, 0, Math.PI * 2);
+                    ctx.fillStyle = '#60a5fa';
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 1.5 * canvasScale;
+                    ctx.moveTo(checkX - (2.5 * canvasScale), avY - (9 * canvasScale));
+                    ctx.lineTo(checkX - (0.5 * canvasScale), avY - (7 * canvasScale));
+                    ctx.lineTo(checkX + (2.5 * canvasScale), avY - (11 * canvasScale));
+                    ctx.stroke();
+
+                    // 小 LIVE 紅燈
+                    ctx.beginPath();
+                    ctx.arc(avX + avRadius + (10 * canvasScale), avY + (10 * canvasScale), 3 * canvasScale, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fill();
+                    ctx.fillStyle = '#e5e7eb';
+                    ctx.font = `bold ${Math.round(9 * canvasScale)}px sans-serif`;
+                    ctx.fillText('LIVE', avX + avRadius + (16 * canvasScale), avY + (11 * canvasScale));
+
+                    // 右邊「直播中」與在線人數
+                    const rightOffset = outWidth - padding;
+                    
+                    const tagW = 70 * canvasScale;
+                    const tagH = 26 * canvasScale;
+                    ctx.beginPath();
+                    ctx.roundRect(rightOffset - tagW, topY - (13 * canvasScale), tagW, tagH, 5 * canvasScale);
+                    ctx.fillStyle = '#dc2626';
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${Math.round(10 * canvasScale)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText('直播中', rightOffset - tagW/2, topY + (5 * canvasScale));
+
+                    const viewCountStr = (parseInt(inputViewerCount.value) || 0).toLocaleString();
+                    const numTagW = 85 * canvasScale;
+                    ctx.beginPath();
+                    ctx.roundRect(rightOffset - tagW - numTagW - (8 * canvasScale), topY - (13 * canvasScale), numTagW, tagH, 5 * canvasScale);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `bold ${Math.round(10 * canvasScale)}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText('👁️ ' + viewCountStr, rightOffset - tagW - numTagW/2 - (8 * canvasScale), topY + (5 * canvasScale));
+                    ctx.restore();
+                }
+
+                // --- 繪製酸民留言區 (已完全移除背景色塊，僅繪製文字 + 降落傘陰影，套用 canvasScale) ---
+                if (toggleComments.checked && activeComments.length > 0) {
+                    ctx.save();
+                    const padding = outWidth * 0.04;
+                    const listYStart = outHeight * 0.88 - (40 * canvasScale); // 留言板底線起算
+
+                    // 留言寬度與配置收斂
+                    const maxBoxWidth = outWidth * 0.55; 
+                    const drawList = activeComments.slice(-8).reverse();
+                    let currentY = listYStart;
+
+                    // 根據控制台設定，等比縮放 Canvas 端的字體大小與行高
+                    const baseUiSize = parseFloat(commentSizeRange.value) || 11.5;
+                    const baseFontSize = baseUiSize * canvasScale;
+                    const nameFontSize = (baseUiSize - 0.5) * canvasScale;
+                    const lineSpacing = baseFontSize * 1.35;
+
+                    drawList.forEach((comment) => {
+                        ctx.font = `${Math.round(baseFontSize)}px sans-serif`;
+                        const textLines = wrapText(ctx, comment.text, maxBoxWidth - (36 * canvasScale));
+                        
+                        // 精準的高動態自適應框高計算法 (解決重疊、擠壓問題)
+                        const usernameHeight = nameFontSize;
+                        const gap = 4 * canvasScale;
+                        const textHeight = textLines.length * lineSpacing;
+                        const boxH = usernameHeight + gap + textHeight + (8 * canvasScale);
+
+                        currentY -= (boxH + (10 * canvasScale));
+
+                        // 防止留言侵入上方區域
+                        if (currentY < outHeight * 0.45) return;
+
+                        // 1. 繪製真實人像頭貼 (同步縮放尺寸)
+                        const avRadius = 14 * canvasScale; // 完美的動態頭貼半徑
+                        const avX = padding + avRadius;
+                        const avY = currentY + avRadius + (2 * canvasScale);
+
+                        const img = getAvatarImage(comment.avatarUrl);
+                        
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(avX, avY, avRadius, 0, Math.PI * 2);
+                        ctx.clip(); // 圓形遮罩
+
+                        // 由於採用 CORS 授權的 Lorem Picsum 圖片，此處能在 Canvas 繪製且不報錯
+                        if (img.complete && img.naturalWidth !== 0) {
+                            ctx.drawImage(img, avX - avRadius, avY - avRadius, avRadius * 2, avRadius * 2);
+                        } else {
+                            ctx.fillStyle = 'rgba(100, 116, 139, 0.8)';
+                            ctx.fill();
+                        }
+                        ctx.restore();
+
+                        // 2. 直接繪製文字並施加立體高對比黑陰影，確保在任何底片顏色下皆可視
+                        ctx.save();
+                        ctx.shadowColor = 'rgba(0, 0, 0, 1)';
+                        ctx.shadowBlur = 8 * canvasScale;
+                        ctx.shadowOffsetX = 1.5 * canvasScale;
+                        ctx.shadowOffsetY = 1.5 * canvasScale;
+
+                        // 3. 繪製使用者名稱
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'top';
+                        
+                        ctx.font = `bold ${Math.round(nameFontSize)}px sans-serif`;
+                        ctx.fillStyle = '#93c5fd'; 
+                        ctx.fillText(comment.username, avX + avRadius + (8 * canvasScale), currentY + (4 * canvasScale));
+
+                        // 4. 繪製內容文字 (完全動態比例化定位，徹底避免帳號內容重疊擠在一起)
+                        ctx.font = comment.isHighlight ? `900 ${Math.round(baseFontSize * 1.05)}px sans-serif` : `${Math.round(baseFontSize)}px sans-serif`;
+                        ctx.fillStyle = comment.isHighlight ? '#fee2e2' : '#f3f4f6';
+
+                        let lineY = currentY + (4 * canvasScale) + nameFontSize + gap;
+                        textLines.forEach((line) => {
+                            ctx.fillText(line, avX + avRadius + (8 * canvasScale), lineY);
+                            lineY += lineSpacing;
+                        });
+                        ctx.restore(); // 還原 shadow 陰影設定，避免汙染其他畫面元素
+                    });
+                    ctx.restore();
+                }
+
+                // --- 繪製倒讚與憤怒等漂浮表情 ---
+                if (toggleReactions.checked && activeReactions.length > 0) {
+                    ctx.save();
+                    const now = Date.now();
+                    activeReactions = activeReactions.filter(r => (now - r.createdAt) < r.duration);
+
+                    activeReactions.forEach((r) => {
+                        const elapsed = now - r.createdAt;
+                        const percent = elapsed / r.duration;
+
+                        const y = outHeight * r.startY - (percent * outHeight * 0.65);
+                        const waveX = r.xMid + (r.xEnd - r.xMid) * percent;
+                        const x = outWidth * r.startX + waveX;
+
+                        let alpha = 1;
+                        if (percent < 0.1) {
+                            alpha = percent * 10;
+                        } else if (percent > 0.7) {
+                            alpha = 1 - ((percent - 0.7) / 0.3);
+                        }
+
+                        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+                        ctx.font = `${r.size * 2}px sans-serif`; 
+                        ctx.fillText(r.emoji, x, y);
+                    });
+                    ctx.restore();
+                }
+
+                // --- 繪製底部虛擬輸入框 ---
+                if (toggleInputBar.checked) {
+                    ctx.save();
+                    const padding = outWidth * 0.04;
+                    const barY = outHeight * 0.92;
+                    const barW = outWidth - (padding * 2);
+                    const barH = 46 * canvasScale;
+
+                    ctx.beginPath();
+                    ctx.roundRect(padding, barY, barW, barH, 23 * canvasScale);
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                    ctx.fill();
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#d1d5db';
+                    ctx.font = `${Math.round(11 * canvasScale)}px sans-serif`;
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('💬 與 obsess 互動...', padding + (16 * canvasScale), barY + barH/2);
+
+                    ctx.font = `${Math.round(16 * canvasScale)}px sans-serif`;
+                    ctx.textAlign = 'right';
+                    ctx.fillText('👎', padding + barW - (16 * canvasScale), barY + barH/2 + (1 * canvasScale));
+                    ctx.restore();
+                }
+
+                canvasRenderLoopId = requestAnimationFrame(renderFrame);
+            }
+
+            canvasRenderLoopId = requestAnimationFrame(renderFrame);
+        }
+
+        // 輔助函數：Canvas 文字自動折行
+        function wrapText(ctx, text, maxWidth) {
+            const words = text.split('');
+            let lines = [];
+            let currentLine = '';
+
+            for (let n = 0; n < words.length; n++) {
+                let testLine = currentLine + words[n];
+                let metrics = ctx.measureText(testLine);
+                let testWidth = metrics.width;
+                if (testWidth > maxWidth && n > 0) {
+                    lines.push(currentLine);
+                    currentLine = words[n];
+                } else {
+                    currentLine = testLine;
+                }
+            }
+            lines.push(currentLine);
+            return lines;
+        }
+
+        // --- 11. 錄影導出系統設定 ---
+        btnStartRec.addEventListener('click', async () => {
+            if (isRecording) return;
+
+            recordedChunks = [];
+            const canvas = document.getElementById('exportCanvas');
+
+            isRecording = true;
+            startCanvasRenderLoop();
+
+            const stream = canvas.captureStream(30);
+
+            try {
+                const videoStream = mainVideo.captureStream ? mainVideo.captureStream() : (mainVideo.mozCaptureStream ? mainVideo.mozCaptureStream() : null);
+                if (videoStream) {
+                    const audioTracks = videoStream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        stream.addTrack(audioTracks[0]);
+                    }
+                }
+            } catch (e) {
+                console.warn("未能擷取原影片音軌。將錄製無聲版疊加層。", e);
+            }
+
+            let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm;codecs=vp8' };
+            }
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+            }
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/mp4' }; 
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                console.error("無法初始化 MediaRecorder:", e);
+                alert("此瀏覽器不支援本錄影合成機制，建議使用 Chrome 開啟。");
+                isRecording = false;
+                cancelAnimationFrame(canvasRenderLoopId);
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `obsess_live_prop_${Date.now()}.webm`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                recStatus.textContent = "導出成功！已自動下載檔案。";
+                recStatus.className = "text-center text-[11px] text-emerald-400 font-bold";
+            };
+
+            mediaRecorder.start();
+
+            btnStartRec.disabled = true;
+            btnStopRec.disabled = false;
+            recStatus.textContent = "錄製中... UI 元素正在實時合成";
+            recStatus.className = "text-center text-[11px] text-red-500 font-bold animate-pulse";
+            recIndicator.className = "inline-flex h-2 w-2 rounded-full bg-red-500 animate-ping";
+        });
+
+        btnStopRec.addEventListener('click', () => {
+            if (!isRecording || !mediaRecorder) return;
+
+            mediaRecorder.stop();
+            isRecording = false;
+            cancelAnimationFrame(canvasRenderLoopId);
+
+            btnStartRec.disabled = false;
+            btnStopRec.disabled = true;
+            recIndicator.className = "inline-flex h-2 w-2 rounded-full bg-gray-400";
+        });
+
+        // --- 12. 初始化引擎 ---
+        window.onload = function() {
+            restartCommentEngine();
+            restartDislikeEngine();
+            updateCommentSize(); // 載入時初始化文字大小變數
+            
+            // 預載初始留言
+            for (let i = 0; i < 4; i++) {
+                setTimeout(() => {
+                    spawnComment();
+                }, i * 350);
+            }
+        };
+    </script>
+</body>
+</html>

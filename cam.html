@@ -1,0 +1,2043 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberTracker HUD - 即時視訊真實物件軌跡追蹤系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Share Tech Mono (科技感等寬字型) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace, 'Courier New', Courier, monospace;
+            background-color: #020617;
+            overflow: hidden;
+            user-select: none;
+        }
+        /* 隱藏滾動條 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(16, 185, 129, 0.4);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(16, 185, 129, 0.7);
+        }
+        /* 霓虹發光陰影 */
+        .neon-shadow-green {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+            text-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+        }
+        .neon-shadow-red {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);
+            text-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+        }
+        .neon-shadow-blue {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+            text-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+        }
+        .neon-shadow-amber {
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.15);
+            text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+        }
+
+        /* --- Instagram 貼文框專屬固定比例樣式表 (對標 Screenshot_20260708_122625) --- */
+        .ig-post-card {
+            width: 400px;
+            height: 600px;
+            position: absolute;
+            transform-origin: 200px 256px; /* 縮放中心完美錨定在 400x400 的照片窗格幾何中心 */
+            box-sizing: border-box;
+            border-radius: 14px;
+            border-width: 1px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            transition: opacity 0.25s ease;
+            background-color: transparent !important; /* 確保主外框底層完全透明，不遮擋任何像素 */
+        }
+
+        /* Header (56px) */
+        .ig-header {
+            display: flex;
+            align-items: center;
+            height: 56px;
+            padding: 0 16px;
+            box-sizing: border-box;
+            border-bottom-width: 1px;
+        }
+        .ig-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15);
+        }
+        .ig-avatar i {
+            font-size: 14px;
+            color: #ffffff;
+        }
+        .ig-username {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: -0.1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 260px;
+        }
+        .ig-menu-dots {
+            margin-left: auto;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        /* Photo Area (400px x 400px) */
+        .ig-photo-area {
+            width: 400px;
+            height: 400px;
+            background: transparent !important; /* 確保中央區塊完全鏤空 */
+            flex-shrink: 0;
+        }
+
+        /* Footer (144px) */
+        .ig-footer {
+            height: 144px;
+            padding: 12px 16px 14px 16px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* 按鈕列 */
+        .ig-actions {
+            display: flex;
+            align-items: center;
+            position: relative;
+            height: 24px;
+        }
+        .ig-left-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .ig-icon-btn {
+            font-size: 21px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .ig-icon-btn:active {
+            transform: scale(0.9);
+        }
+        /* 中間三點分頁器 */
+        .ig-carousel-dots {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .ig-carousel-dot {
+            border-radius: 50%;
+        }
+        .ig-dot-active {
+            width: 6.5px;
+            height: 6.5px;
+        }
+        .ig-dot-inactive-1 {
+            width: 5.5px;
+            height: 5.5px;
+        }
+        .ig-dot-inactive-2 {
+            width: 4.5px;
+            height: 4.5px;
+        }
+        .ig-bookmark-btn {
+            margin-left: auto;
+            font-size: 20px;
+        }
+
+        /* 社群資訊內容 */
+        .ig-details-block {
+            flex-1: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            margin-top: 6px;
+            line-height: 1.35;
+        }
+        .ig-likes {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 3px;
+        }
+        .ig-caption {
+            font-size: 13px;
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .ig-caption-name {
+            font-weight: 700;
+            margin-right: 5px;
+        }
+        .ig-comment {
+            font-size: 12.5px;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .ig-comment-name {
+            font-weight: 700;
+            margin-right: 5px;
+        }
+        .ig-time {
+            font-size: 9.5px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+    </style>
+</head>
+<body class="text-emerald-400 min-h-screen flex flex-col relative">
+
+    <!-- 全螢幕開機引導遮罩 (Force Setup Portal) -->
+    <div id="startup-portal" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6 transition-all duration-700">
+        <!-- 裝飾用未來感背景微弱網格 -->
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.02)_1px,transparent_1px)] bg-[size:30px_30px] pointer-events-none"></div>
+        
+        <div class="max-w-xl w-full bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-8 backdrop-blur-lg shadow-2xl relative z-10 space-y-6">
+            <!-- 標題 -->
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-3xl mb-2">
+                    <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                </div>
+                <h1 class="text-2xl font-bold tracking-widest text-white">CYBERTRACKER HUD</h1>
+                <p class="text-xs text-emerald-500/60 uppercase">System Initialization & Media Setup Protocol</p>
+            </div>
+
+            <!-- 載入核心狀態與進度條 -->
+            <div class="space-y-3 bg-black/40 p-4 rounded-lg border border-emerald-500/10">
+                <div class="flex justify-between text-xs font-mono">
+                    <span id="load-status-label" class="text-gray-400">正在初始化系統核心...</span>
+                    <span id="load-progress-text" class="text-emerald-400 font-bold">0%</span>
+                </div>
+                <!-- 進度條 -->
+                <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-emerald-500/20">
+                    <div id="load-progress-bar" class="w-0 h-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-300"></div>
+                </div>
+
+                <!-- 各模組細項狀態 -->
+                <div class="grid grid-cols-2 gap-2 text-[10px] font-mono pt-2 text-gray-400">
+                    <div class="flex items-center gap-2">
+                        <span id="status-icon-mediapipe" class="text-amber-500"><i class="fa-solid fa-circle-notch animate-spin"></i></span>
+                        <span>MediaPipe Core (主要核心)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="status-icon-opencv" class="text-gray-500"><i class="fa-solid fa-hourglass-start animate-pulse"></i></span>
+                        <span>OpenCV.js WASM (背景編譯中)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 強制選擇媒體輸入源 -->
+            <div id="media-source-picker" class="space-y-3 opacity-40 pointer-events-none transition-opacity duration-500">
+                <span class="text-xs text-gray-400 block font-bold uppercase tracking-wider text-center"><i class="fa-solid fa-play mr-1"></i> 請選擇視訊輸入源以啟動追蹤</span>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- 上傳本機影片 -->
+                    <label class="flex flex-col items-center justify-center p-4 bg-slate-950 border border-emerald-500/20 rounded-xl hover:border-emerald-500 hover:bg-emerald-950/20 cursor-pointer transition text-center group">
+                        <i class="fa-solid fa-file-video text-2xl text-emerald-500 mb-2 group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs font-bold text-white">上傳您指定的影片</span>
+                        <span class="text-[9px] text-gray-500 mt-1">支援自訂 MP4 / MOV 檔案</span>
+                        <input type="file" id="portal-video-upload" class="hidden" accept="video/*" />
+                    </label>
+
+                    <!-- 使用 Webcam 現場追蹤 -->
+                    <button id="btn-portal-webcam" class="flex flex-col items-center justify-center p-4 bg-slate-950 border border-emerald-500/20 rounded-xl hover:border-emerald-500 hover:bg-emerald-950/20 transition text-center group">
+                        <i class="fa-solid fa-camera text-2xl text-emerald-400 mb-2 group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs font-bold text-white">開啟現場攝影機</span>
+                        <span class="text-[9px] text-gray-500 mt-1">演員即時現場追蹤互動</span>
+                    </button>
+                </div>
+
+                <!-- 使用預設測試素材 -->
+                <button id="btn-portal-default" class="w-full py-2.5 bg-emerald-950/30 border border-emerald-500/30 rounded-lg text-xs font-bold text-emerald-400 hover:bg-emerald-950/60 hover:border-emerald-500 transition block">
+                    <i class="fa-solid fa-film mr-1"></i> 使用系統預設測試影片 (20260707-1124-04.mp4)
+                </button>
+            </div>
+
+            <!-- 視訊加載狀態 -->
+            <div id="portal-video-loading" class="hidden text-center py-2 space-y-2">
+                <div class="text-xs text-amber-400 animate-pulse"><i class="fa-solid fa-circle-notch animate-spin mr-1"></i> 正在解析並加載視訊串流...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主顯示區域：乾淨的視訊與繪圖畫布疊加 -->
+    <div class="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden bg-black" id="video-container">
+        
+        <!-- 底層：視訊播放器 -->
+        <video id="main-video" class="absolute object-contain w-full h-full" loop muted playsinline crossorigin="anonymous"></video>
+
+        <!-- 中間層：即時偵測畫布 (Canvas) -->
+        <canvas id="overlay-canvas" class="absolute z-20 pointer-events-auto cursor-crosshair"></canvas>
+
+        <!-- 最上層：即時 HTML 社群貼文疊加層 (pointer-events-none 確保不干擾 Canvas 的點選與拖曳) -->
+        <div id="ig-overlay-container" class="absolute inset-0 pointer-events-none z-30 overflow-hidden"></div>
+
+        <!-- 輔助十字瞄準線 (非常低調的中心定位線) -->
+        <div class="absolute z-10 w-full h-[1px] bg-emerald-500/5 pointer-events-none top-1/2 left-0"></div>
+        <div class="absolute z-10 h-full w-[1px] bg-emerald-500/5 pointer-events-none left-1/2 top-0"></div>
+    </div>
+
+    <!-- 主控制面板 -->
+    <div id="control-panel" class="fixed top-6 right-6 z-40 w-96 max-h-[90vh] bg-slate-950/95 border border-emerald-500/30 rounded-xl shadow-2xl backdrop-blur-md flex flex-col overflow-hidden transition-all duration-300 text-sm hidden">
+        
+        <!-- 面板標題列 (優化觸碰/點選面積，防拖曳衝突) -->
+        <div class="bg-slate-900/80 px-4 py-3 border-b border-emerald-500/20 flex items-center justify-between cursor-move" id="panel-header">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-terminal text-emerald-500 animate-pulse"></i>
+                <span class="font-bold tracking-widest uppercase">CYBER_TRACK_CENTER</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <!-- 增大 hit-zone 熱區並阻斷 mousedown 事件防止拖曳干擾 -->
+                <button id="btn-minimize" class="text-gray-400 hover:text-white transition-colors p-2 text-base flex items-center justify-center cursor-pointer min-w-[36px] min-h-[36px]" title="收合面板">
+                    <i class="fa-solid fa-minus"></i>
+                </button>
+                <button id="btn-hide-console" class="text-red-400 hover:text-red-300 transition-colors p-2 text-base flex items-center justify-center cursor-pointer min-w-[36px] min-h-[36px]" title="完全隱藏控制台 (快捷鍵: H)">
+                    <i class="fa-solid fa-eye-slash"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- 面板內容區域 -->
+        <div id="panel-content" class="flex-1 p-4 overflow-y-auto space-y-4">
+            
+            <!-- 引擎載入狀態 -->
+            <div class="grid grid-cols-2 gap-2 text-[10px] bg-black/50 p-2 rounded border border-emerald-500/10 font-mono">
+                <div>
+                    <span class="text-gray-500">OPENCV.JS:</span> 
+                    <span id="opencv-status" class="font-bold text-amber-500">● LOADING</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">MEDIAPEPIE:</span> 
+                    <span id="mediapipe-status" class="font-bold text-amber-500">● LOADING</span>
+                </div>
+            </div>
+
+            <!-- 視訊與輸入源控制 -->
+            <div class="space-y-2 border-b border-slate-800 pb-3">
+                <span class="text-xs text-emerald-500/70 font-semibold tracking-wider block uppercase"><i class="fa-solid fa-video mr-1"></i> VIDEO_INPUT / 視訊輸入源</span>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-source-default" class="bg-emerald-950/40 border border-emerald-500/50 text-white px-3 py-1.5 rounded text-xs hover:bg-emerald-900/50 transition">
+                        <i class="fa-solid fa-film mr-1"></i> 預設影片素材
+                    </button>
+                    <button id="btn-source-webcam" class="bg-slate-900 border border-slate-700 text-gray-400 px-3 py-1.5 rounded text-xs hover:border-emerald-500/50 hover:text-emerald-400 transition">
+                        <i class="fa-solid fa-camera mr-1"></i> 現場攝影機
+                    </button>
+                </div>
+                <!-- 檔案上傳 -->
+                <div class="mt-1">
+                    <label class="w-full flex flex-col items-center px-4 py-2 bg-slate-900 rounded-lg border border-dashed border-emerald-500/20 cursor-pointer hover:border-emerald-500/50 transition text-center">
+                        <i class="fa-solid fa-cloud-arrow-up text-lg text-emerald-500/80 mb-1"></i>
+                        <span class="text-xs text-gray-300 font-bold">更換其他影片檔案</span>
+                        <input type='file' id="video-upload" class="hidden" accept="video/*" />
+                    </label>
+                </div>
+            </div>
+
+            <!-- Instagram HUD 模擬器 (Rock Band MV 專用) -->
+            <div class="space-y-3 border-b border-slate-800 pb-3">
+                <span class="text-xs text-emerald-500/70 font-semibold tracking-wider block uppercase"><i class="fa-brands fa-instagram mr-1"></i> INSTAGRAM_HUD_SIMULATION / 社群貼文濾鏡</span>
+                
+                <div class="flex items-center justify-between">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="chk-enable-ig-frame" class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-white font-bold uppercase">啟用 Instagram 貼文框</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-gray-500">介面風格主題</label>
+                        <select id="select-ig-theme" class="w-full bg-slate-900 border border-emerald-500/20 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500">
+                            <option value="dark" selected>Cyberpunk Dark (暗色)</option>
+                            <option value="light">Classic Light (經典白)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-gray-500">社群留言極性</label>
+                        <select id="select-comment-type" class="w-full bg-slate-900 border border-emerald-500/20 rounded px-2 py-1 text-white focus:outline-none focus:border-emerald-500">
+                            <option value="praise" selected>Praise/Fans (樂迷擁護)</option>
+                            <option value="troll">Haters/Trolls (酸民嘲諷)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 追蹤引擎與演算法設定 -->
+            <div class="space-y-3 border-b border-slate-800 pb-3">
+                <span class="text-xs text-emerald-500/70 font-semibold tracking-wider block uppercase"><i class="fa-solid fa-brain mr-1"></i> AI_TRACKING_ALGORITHM / 追蹤核心</span>
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1">主追蹤模式</label>
+                    <select id="select-engine" class="w-full bg-slate-900 border border-emerald-500/30 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
+                        <option value="object_detector" selected>MediaPipe Object (真實多物件辨識)</option>
+                        <option value="face_detector">MediaPipe Face (真實人臉追蹤)</option>
+                        <option value="luminance_range">Luminance Range (亮度區間追蹤)</option>
+                        <option value="color_range">Color Chroma Range (特定顏色追蹤)</option>
+                        <option value="opencv_flow">OpenCV.js Optical Flow (手動點選光流)</option>
+                    </select>
+                </div>
+
+                <!-- 亮度區間追蹤控制器 -->
+                <div id="control-luminance" class="bg-black/30 p-2.5 rounded border border-slate-800 space-y-2">
+                    <span class="text-[11px] text-gray-400 uppercase tracking-wider block font-bold">亮度區間設定</span>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500">最低亮度: <span id="val-lum-min" class="text-emerald-400 font-bold">180</span></label>
+                            <input type="range" id="range-lum-min" min="0" max="255" value="180" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500">最高亮度: <span id="val-lum-max" class="text-emerald-400 font-bold">255</span></label>
+                            <input type="range" id="range-lum-max" min="0" max="255" value="255" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 顏色區間追蹤控制器 -->
+                <div id="control-color" class="bg-black/30 p-2.5 rounded border border-slate-800 space-y-2">
+                    <span class="text-[11px] text-gray-400 uppercase tracking-wider block font-bold">特定色彩鎖定</span>
+                    <div class="flex items-center gap-3">
+                        <div class="flex flex-col gap-1">
+                            <label class="text-[10px] text-gray-500">目標色彩</label>
+                            <input type="color" id="picker-target-color" value="#10b981" class="w-10 h-8 rounded border border-slate-700 bg-transparent cursor-pointer">
+                        </div>
+                        <div class="flex-1 space-y-1">
+                            <div class="flex justify-between text-[10px]">
+                                <span class="text-gray-500">色彩容差 (Chroma Tol)</span>
+                                <span id="val-color-tol" class="text-emerald-400 font-bold">30</span>
+                            </div>
+                            <input type="range" id="range-color-tol" min="5" max="100" value="30" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 信心度/過濾閾值設定 -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-gray-400">偵測閾值 / 信心度 (Score Threshold)</span>
+                        <span id="val-threshold" class="text-emerald-400 font-bold">0.35</span>
+                    </div>
+                    <input type="range" id="range-threshold" min="0.1" max="0.9" step="0.05" value="0.35" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-gray-400">最大鎖定追蹤數 (Max Targets)</span>
+                        <span id="val-max-targets" class="text-emerald-400 font-bold">8</span>
+                    </div>
+                    <input type="range" id="range-max-targets" min="1" max="25" value="8" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-gray-400">追蹤鎖定平滑係數 (Smooth)</span>
+                        <span id="val-smooth" class="text-emerald-400 font-bold">0.25</span>
+                    </div>
+                    <input type="range" id="range-smooth" min="0.05" max="1.0" step="0.05" value="0.25" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+            </div>
+
+            <!-- 視覺 HUD 樣式與四元樹自訂 -->
+            <div class="space-y-3 border-b border-slate-800 pb-3">
+                <span class="text-xs text-emerald-500/70 font-semibold tracking-wider block uppercase"><i class="fa-solid fa-palette mr-1"></i> HUD_STYLING / 視覺自訂</span>
+                
+                <!-- 追蹤框大小微調 -->
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-gray-400">追蹤框縮放比例 (Box Scale)</span>
+                        <span id="val-box-scale" class="text-emerald-400 font-bold">1.0 x</span>
+                    </div>
+                    <input type="range" id="range-box-scale" min="0.5" max="3.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+
+                <!-- 四元樹解構效果控制 -->
+                <div class="bg-black/40 p-2.5 rounded border border-emerald-500/15 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="chk-quadtree" checked class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                            <span class="text-xs text-white font-bold uppercase">啟用 Bounding Box 四元樹解構</span>
+                        </label>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500">最大剖分深度: <span id="val-qt-depth" class="text-emerald-400 font-bold">4</span></label>
+                            <input type="range" id="range-qt-depth" min="2" max="6" value="4" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500">分裂方差敏感度: <span id="val-qt-threshold" class="text-emerald-400 font-bold">30</span></label>
+                            <input type="range" id="range-qt-threshold" min="5" max="100" value="30" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                        <!-- 四元樹解構不透明度控制 -->
+                        <div class="space-y-1 col-span-2 pt-1">
+                            <label class="text-[10px] text-gray-500">解構不透明度 (Opacity): <span id="val-qt-opacity" class="text-emerald-400 font-bold">65%</span></label>
+                            <input type="range" id="range-qt-opacity" min="0" max="100" value="65" class="w-full h-1 bg-slate-800 rounded accent-emerald-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主題色彩 -->
+                <div>
+                    <label class="text-xs text-gray-400 block mb-1.5">主色調</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button data-color="green" class="btn-color bg-emerald-950/80 border-2 border-emerald-500 text-emerald-400 rounded py-1 text-xs font-bold hover:bg-emerald-900/50">綠色</button>
+                        <button data-color="red" class="btn-color bg-slate-900 border border-slate-700 text-red-500 rounded py-1 text-xs hover:bg-red-950/20">紅色</button>
+                        <button data-color="blue" class="btn-color bg-slate-900 border border-slate-700 text-blue-500 rounded py-1 text-xs hover:bg-blue-950/20">藍色</button>
+                        <button data-color="amber" class="btn-color bg-slate-900 border border-slate-700 text-amber-500 rounded py-1 text-xs hover:bg-amber-950/20">橘黃</button>
+                    </div>
+                </div>
+
+                <!-- 開關與負片複合選項 -->
+                <div class="grid grid-cols-2 gap-2 pt-1 font-mono">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="chk-show-coords" checked class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-gray-300">顯示座標資訊</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="chk-show-ids" checked class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-gray-300">顯示目標 ID</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="chk-show-lines" checked class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-gray-300">星座追蹤連線</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="chk-show-emojis" checked class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-gray-300">顯示類別表情</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer col-span-2">
+                        <input type="checkbox" id="chk-show-grid" class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-gray-300">背景微弱格線</span>
+                    </label>
+                    <!-- 框內負片效果開關 -->
+                    <label class="flex items-center gap-2 cursor-pointer col-span-2 pt-1 border-t border-slate-800">
+                        <input type="checkbox" id="chk-invert-content" class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-emerald-400 font-bold">啟用框內負片效果 (Invert Box)</span>
+                    </label>
+                    <!-- 框線與文字差值混合開關 -->
+                    <label class="flex items-center gap-2 cursor-pointer col-span-2">
+                        <input type="checkbox" id="chk-invert-box" class="rounded border-slate-700 text-emerald-500 bg-slate-900 focus:ring-0">
+                        <span class="text-xs text-emerald-400 font-bold">框線/文字差值負片 (高對比)</span>
+                    </label>
+                </div>
+
+                <div class="space-y-2 pt-1">
+                    <div class="flex justify-between text-xs font-mono">
+                        <span class="text-gray-400">線條粗細 (Line Width)</span>
+                        <span id="val-linewidth" class="text-emerald-400 font-bold">1 px</span>
+                    </div>
+                    <input type="range" id="range-linewidth" min="1" max="4" value="1" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                </div>
+            </div>
+
+            <!-- 終端機系統日誌 -->
+            <div class="space-y-2">
+                <span class="text-xs text-emerald-500/70 font-semibold tracking-wider block uppercase"><i class="fa-solid fa-scroll mr-1"></i> SYSTEM_CONSOLE_LOG / 系統日誌</span>
+                <div id="terminal-log" class="w-full h-24 bg-black/95 rounded border border-emerald-500/10 p-2 font-mono text-[10px] leading-relaxed overflow-y-auto text-emerald-500 flex flex-col gap-0.5">
+                    <p class="text-gray-500">[00:00:00] INIT_SYSTEM... OK</p>
+                    <p class="text-gray-500">[00:00:00] LOADING CV LIBRARIES...</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 控制面板底部 -->
+        <div class="p-3 bg-slate-900/60 border-t border-emerald-500/15 text-center flex gap-2">
+            <button id="btn-reset-trackers" class="flex-1 bg-red-950/30 border border-red-500/30 hover:bg-red-900/50 text-red-400 text-xs py-1.5 rounded transition">
+                <i class="fa-solid fa-trash mr-1"></i> 清除追蹤點
+            </button>
+            <button id="btn-fullscreen" class="bg-slate-800 hover:bg-slate-700 text-white text-xs px-3 py-1.5 rounded transition">
+                <i class="fa-solid fa-expand"></i> 全螢幕
+            </button>
+        </div>
+    </div>
+
+    <!-- 全螢幕閃爍/警告效果 -->
+    <div id="glitch-overlay" class="fixed inset-0 bg-red-500/5 z-50 pointer-events-none opacity-0 transition-opacity duration-150"></div>
+
+    <!-- 離線分析高效率解析度 Canvas：供 HSV、亮度與影像分析像素處理 -->
+    <canvas id="offline-canvas" class="hidden"></canvas>
+
+    <!-- OpenCV.js 載入 -->
+    <script>
+        window.Module = {
+            onRuntimeInitialized: function() {
+                if (window.onOpenCvReady) {
+                    window.onOpenCvReady();
+                }
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@david-mark/opencv-js@4.6.0/opencv.js" async defer></script>
+
+    <!-- MediaPipe 模組載入 -->
+    <script type="module">
+        import { FilesetResolver, ObjectDetector, FaceDetector } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8";
+        window.FilesetResolver = FilesetResolver;
+        window.ObjectDetector = ObjectDetector;
+        window.FaceDetector = FaceDetector;
+        
+        // 延時發起 MediaPipe 初始化，確保順序正確
+        setTimeout(() => {
+            if (window.initMediaPipe) {
+                window.initMediaPipe();
+            }
+        }, 150);
+    </script>
+
+    <!-- 主要邏輯 JS -->
+    <script>
+        const video = document.getElementById('main-video');
+        const canvas = document.getElementById('overlay-canvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('video-container');
+
+        // 預置 8 組精細定義的搖滾 MV 社群帳號資料庫（包含樂迷擁護、酸民留言極性）
+        const bandIgUsers = [
+            {
+                username: "rock_god_slash",
+                avatarColor: "#ef4444",
+                likes: "12,854",
+                caption: "吉他 Solo 旋律直接超渡我的靈魂 🎸⚡",
+                praise: "這才是真正的搖滾！吉他手簡直是神！",
+                troll: "過時的芭樂歌旋律。那個點弦是不是彈錯音符了？"
+            },
+            {
+                username: "metal_head_charlie",
+                avatarColor: "#3b82f6",
+                likes: "8,921",
+                caption: "今天的衝撞區根本是修羅場！ 🤘🔥",
+                praise: "今生聽過最震撼的現場！全團太硬核了！",
+                troll: "衝撞？看起來像大叔大嬸在慢跑，笑死。"
+            },
+            {
+                username: "synth_junkie_99",
+                avatarColor: "#10b981",
+                likes: "14,310",
+                caption: "這次 MV 視覺藝術風格太前衛了吧！",
+                praise: "色調跟畫面顆粒感無敵，美學高度直接拉滿！",
+                troll: "五毛錢特效，像用免錢剪輯軟體套個濾鏡而已。"
+            },
+            {
+                username: "bass_slapper_pro",
+                avatarColor: "#f59e0b",
+                likes: "5,441",
+                caption: "有沒有人注意到那個神扯的 Slap 貝斯？🎸",
+                praise: "貝斯手一如既往地默默凱瑞整首歌，超帥！",
+                troll: "根本聽不到貝斯，可以把他的音量關小或者開除嗎？"
+            },
+            {
+                username: "drummer_boi_max",
+                avatarColor: "#ec4899",
+                likes: "21,040",
+                caption: "打鼓打到棒子起火了 🥁💦",
+                praise: "雙踏大鼓太殘暴了！鼓手根本是章魚轉世吧！",
+                troll: "鼓手一直在趕拍，整首速度忽快忽慢，聽了超焦慮。"
+            },
+            {
+                username: "vocal_coach_sarah",
+                avatarColor: "#8b5cf6",
+                likes: "32,118",
+                caption: "主唱最後那一聲高音死腔起雞皮疙瘩！",
+                praise: "這爆發力跟真假音轉換完全是怪物等級！",
+                troll: "唱得歇斯底里，這高音 100% 是靠後製 autotune 吧。"
+            },
+            {
+                username: "music_critic_jack",
+                avatarColor: "#64748b",
+                likes: "1,520",
+                caption: "新單曲深度解析短評... 📝👇",
+                praise: "當代硬搖滾的又一里程碑之作。5/5 顆星！",
+                troll: "毫無新意的口水歌。完全是在複製 80 年代的殘渣。"
+            },
+            {
+                username: "groupie_clara",
+                avatarColor: "#f43f5e",
+                likes: "43,900",
+                caption: "主唱請娶我！！！ 😍💖 @rock_band",
+                praise: "單曲循環整天，連洗澡都在哼，太洗腦了！",
+                troll: "這團會紅純粹是因為主唱長得帥，音樂根本沒料。"
+            }
+        ];
+
+        // 參數與狀態
+        let trackingEngine = 'object_detector'; // object_detector, face_detector, luminance_range, color_range, opencv_flow
+        let scoreThreshold = 0.35;
+        let maxTargets = 8;
+        let lerpAmount = 0.25; 
+        let colors = {
+            primary: 'rgba(16, 185, 129, 1)',    // 亮綠
+            primaryAlpha: 'rgba(16, 185, 129, 0.15)',
+            accent: '#34d399',
+            text: '#a7f3d0'
+        };
+        let options = {
+            showCoords: true,
+            showIds: true,
+            showLines: true,
+            showEmojis: true,
+            showGrid: false,
+            lineWidth: 1,
+            boxScale: 1.0,        // 追蹤框縮放比例
+            enableQuadtree: true,  // 啟用四元樹處理
+            qtMaxDepth: 4,        // 四元樹最大深度
+            qtThreshold: 30,       // 四元樹分裂敏感度
+            qtOpacity: 0.65,      // 四元樹渲染不透明度
+            invertContent: false, // 框內負片效果
+            invertBoxColor: false, // 框線與字體差值混合效果
+            enableIGFrame: false,  // 啟用 Instagram 貼文框模式
+            igTheme: 'dark',       // ig 貼文風格 (dark, light)
+            commentType: 'praise'  // comment 極性 (praise, troll)
+        };
+
+        // 亮度與色彩過濾參數
+        let filterLumMin = 180;
+        let filterLumMax = 255;
+        let targetColorHex = "#10b981";
+        let targetColorHsv = { h: 158, s: 0.91, v: 0.73 }; // 由 #10b981 轉換而來
+        let colorTolerance = 30;
+
+        const availableEmojis = ["🤖", "👁️", "🎯", "🛸", "⚠️", "👤", "📦", "💻", "🕶️", "🚗", "🐾"];
+        let trackers = [];
+        let stream = null;
+
+        // 效能控制變數
+        let lastProcessingTime = 0;
+        const processingInterval = 66; // 限制 analysis 每秒最多執行 15 次
+        let systemReady = { opencv: false, mediapipe: false };
+        let isEngineInitialized = false;
+
+        // 系統日誌記錄
+        const terminalLog = document.getElementById('terminal-log');
+        function addLog(msg, type = 'info') {
+            const time = new Date().toTimeString().split(' ')[0];
+            let colorClass = 'text-gray-400';
+            if (type === 'success') colorClass = 'text-emerald-400 font-semibold';
+            if (type === 'warn') colorClass = 'text-amber-400';
+            if (type === 'error') colorClass = 'text-red-500';
+            
+            const p = document.createElement('p');
+            p.className = colorClass;
+            p.innerHTML = `[${time}] ${msg}`;
+            terminalLog.appendChild(p);
+            terminalLog.scrollTop = terminalLog.scrollHeight;
+        }
+
+        // 產生隨機 16 進位目標 ID
+        function generateId() {
+            return '0x' + Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        // --- 色彩轉換與計算輔助函式 ---
+        function hexToRgb(hex) {
+            let r = parseInt(hex.slice(1, 3), 16);
+            let g = parseInt(hex.slice(3, 5), 16);
+            let b = parseInt(hex.slice(5, 7), 16);
+            return { r, g, b };
+        }
+
+        function rgbToHsv(r, g, b) {
+            r /= 255, g /= 255, b /= 255;
+            let max = Math.max(r, g, b), min = Math.min(r, g, b);
+            let h, s, v = max;
+            let d = max - min;
+            s = max === 0 ? 0 : d / max;
+            if (max === min) {
+                h = 0;
+            } else {
+                switch (max) {
+                    case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                    case g: h = (b - r) / d + 2; break;
+                    case b: h = (r - g) / d + 4; break;
+                }
+                h /= 6;
+            }
+            return { h: h * 360, s, v };
+        }
+
+        // 根據選取顏色 hex 更新 Hsv 基準
+        function updateTargetColorHSV() {
+            const rgb = hexToRgb(targetColorHex);
+            targetColorHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        }
+
+        // --- 進度條管理系統 ---
+        function updateProgress(percentage, statusLabel) {
+            document.getElementById('load-progress-bar').style.width = `${percentage}%`;
+            document.getElementById('load-progress-text').innerText = `${percentage}%`;
+            document.getElementById('load-status-label').innerText = statusLabel;
+        }
+
+        // --- OpenCV 引擎就緒偵測 ---
+        let cvReady = false;
+        let cvInitialized = false;
+        let prevGray, currGray, currPoints, statusMat, errMat;
+
+        window.onOpenCvReady = function() {
+            cvReady = true;
+            document.getElementById('opencv-status').innerHTML = '<span class="text-emerald-400">● READY</span>';
+            document.getElementById('status-icon-opencv').innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+            systemReady.opencv = true;
+            addLog("OpenCV.js WASM 背景編譯與載入完成。", "success");
+            initCV();
+        }
+
+        function initCV() {
+            if (!cvReady || cvInitialized) return;
+            try {
+                if (typeof cv === 'undefined' || !cv.Mat) {
+                    setTimeout(initCV, 200);
+                    return;
+                }
+                prevGray = new cv.Mat();
+                currGray = new cv.Mat();
+                currPoints = new cv.Mat();
+                statusMat = new cv.Mat();
+                errMat = new cv.Mat();
+                cvInitialized = true;
+                addLog("OpenCV 執行矩陣就緒，支援手動光流演算。", "success");
+            } catch (e) {
+                console.error("OpenCV 初始化失敗:", e);
+                addLog("OpenCV 初始化失敗，手動光流暫時不可用。", "error");
+            }
+        }
+
+        // --- MediaPipe 引擎就緒與載入 ---
+        let objectDetector = null;
+        let faceDetector = null;
+
+        window.initMediaPipe = async function() {
+            try {
+                updateProgress(20, "正在加載 MediaPipe 核心解析組件...");
+                const vision = await window.FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
+                );
+                
+                updateProgress(50, "正在下載多物件偵測模型 (5.6MB)...");
+                objectDetector = await window.ObjectDetector.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
+                        delegate: "GPU"
+                    },
+                    scoreThreshold: scoreThreshold,
+                    runningMode: "VIDEO"
+                });
+
+                updateProgress(80, "正在配置 BlazeFace 人臉跟隨模型...");
+                faceDetector = await window.FaceDetector.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO"
+                });
+
+                updateProgress(100, "系統主模組初始化成功！");
+                systemReady.mediapipe = true;
+
+                document.getElementById('mediapipe-status').innerHTML = '<span class="text-emerald-400">● READY</span>';
+                document.getElementById('status-icon-mediapipe').innerHTML = '<i class="fa-solid fa-circle-check text-emerald-400"></i>';
+                
+                const picker = document.getElementById('media-source-picker');
+                picker.classList.remove('opacity-40', 'pointer-events-none');
+                addLog("MediaPipe AI 多物件/人臉追蹤引擎加載完畢。", "success");
+            } catch (err) {
+                updateProgress(50, "MediaPipe 初始化失敗，改用光學/自訂特徵追蹤模式");
+                addLog(`MediaPipe 載入失敗: ${err.message}`, "error");
+                document.getElementById('mediapipe-status').innerHTML = '<span class="text-red-500">● FAILED</span>';
+                document.getElementById('status-icon-mediapipe').innerHTML = '<i class="fa-solid fa-circle-xmark text-red-500"></i>';
+            }
+        }
+
+        // --- 初始化頁面 ---
+        window.addEventListener('load', () => {
+            adjustCanvasSize();
+            updateTargetColorHSV(); // 初始化 HSV
+        });
+
+        window.addEventListener('resize', adjustCanvasSize);
+        video.addEventListener('loadedmetadata', adjustCanvasSize);
+
+        function adjustCanvasSize() {
+            const rect = video.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            canvas.style.left = `${rect.left - container.getBoundingClientRect().left}px`;
+            canvas.style.top = `${rect.top - container.getBoundingClientRect().top}px`;
+        }
+
+        // --- 啟動與引導畫面解鎖機制 ---
+        function startSystemTracking() {
+            document.getElementById('portal-video-loading').classList.remove('hidden');
+            
+            video.addEventListener('playing', () => {
+                setTimeout(() => {
+                    const portal = document.getElementById('startup-portal');
+                    portal.classList.add('opacity-0', 'pointer-events-none');
+                    
+                    const ctrlPanel = document.getElementById('control-panel');
+                    ctrlPanel.classList.remove('hidden');
+                    
+                    if (!isEngineInitialized) {
+                        isEngineInitialized = true;
+                        requestAnimationFrame(animate);
+                    }
+                    
+                    addLog("視訊串流啟動，開始追蹤特徵目標。", "success");
+                    adjustCanvasSize();
+                }, 800);
+            });
+        }
+
+        // --- 手動光流定位與點擊事件 (僅在光流模式下允許點擊生效，防觸碰穿幫) ---
+        canvas.addEventListener('click', (e) => {
+            if (trackingEngine !== 'opencv_flow') {
+                addLog("當前非手動光流模式。請先在追蹤核心切換為 [OpenCV.js Optical Flow] 後，再於畫面上點擊標定物件。", "warn");
+                return;
+            }
+
+            if (!systemReady.opencv) {
+                addLog("背景 OpenCV.js 尚未編譯完成，手動點擊追蹤暫不可用，請稍候。", "warn");
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const label = "MANUAL_TARGET";
+            const newTracker = {
+                id: generateId(),
+                label: label,
+                emoji: "🎯",
+                tx: clickX,
+                ty: clickY,
+                cx: clickX,
+                cy: clickY,
+                size: 60,
+                signalStrength: 100,
+                manual: true,
+                active: true,
+                igUserIndex: Math.floor(Math.random() * bandIgUsers.length) // 為手動點選點配發固定的 continuity 社群用戶 ID
+            };
+
+            if (trackers.length >= maxTargets) {
+                trackers.shift();
+            }
+            trackers.push(newTracker);
+            
+            if (cvInitialized) {
+                prevGray.delete();
+                prevGray = new cv.Mat();
+            }
+
+            addLog(`[MANUAL_LOCKED] 鎖定坐標: [${Math.round(clickX)}, ${Math.round(clickY)}]`, "success");
+
+            const glitchOverlay = document.getElementById('glitch-overlay');
+            glitchOverlay.style.opacity = '0.3';
+            setTimeout(() => glitchOverlay.style.opacity = '0', 100);
+        });
+
+        // --- 核心圖像分析：MediaPipe 偵測 + OpenCV 光流 + HSV 顏色與亮度解析 ---
+        const offlineCanvas = document.getElementById('offline-canvas');
+        const offlineCtx = offlineCanvas.getContext('2d');
+
+        function processFrame(timestamp) {
+            if (video.paused || video.ended || video.readyState < 2) return;
+
+            // 1. 每 60 FPS 重繪一次離線高速分析 Canvas 緩衝區 (供四元樹與顏色分析實時擷取)
+            const cw = 480;
+            const ch = 270;
+            offlineCanvas.width = cw;
+            offlineCanvas.height = ch;
+            try {
+                offlineCtx.drawImage(video, 0, 0, cw, ch);
+            } catch (err) {
+                return;
+            }
+
+            // 2. 限制分析迴圈在特定間隔內 (每秒最高 ~15 次) 避免卡死
+            if (timestamp - lastProcessingTime < processingInterval) return;
+            lastProcessingTime = timestamp;
+
+            const frame = offlineCtx.getImageData(0, 0, cw, ch);
+            const data = frame.data;
+
+            // --- 判斷當前追蹤模式 ---
+            if (trackingEngine === 'object_detector' && objectDetector) {
+                try {
+                    const detections = objectDetector.detectForVideo(video, timestamp).detections;
+                    syncWithMediaPipe(detections, "object");
+                } catch (e) {}
+            } else if (trackingEngine === 'face_detector' && faceDetector) {
+                try {
+                    const detections = faceDetector.detectForVideo(video, timestamp).detections;
+                    syncWithMediaPipe(detections, "face");
+                } catch (e) {}
+            } else if (trackingEngine === 'luminance_range') {
+                // 亮度特徵分析追蹤
+                processPixelsTracking(data, cw, ch, (r, g, b) => {
+                    const Y = 0.299 * r + 0.587 * g + 0.114 * b; // 亮度公式
+                    return (Y >= filterLumMin && Y <= filterLumMax);
+                }, "LUM_PEAK", "💡");
+            } else if (trackingEngine === 'color_range') {
+                // HSV 色彩特徵分析追蹤
+                processPixelsTracking(data, cw, ch, (r, g, b) => {
+                    const hsv = rgbToHsv(r, g, b);
+                    // 色相環相差距離計算
+                    const deltaH = Math.min(Math.abs(hsv.h - targetColorHsv.h), 360 - Math.abs(hsv.h - targetColorHsv.h));
+                    const deltaS = Math.abs(hsv.s - targetColorHsv.s);
+                    const deltaV = Math.abs(hsv.v - targetColorHsv.v);
+                    
+                    return (deltaH <= colorTolerance * 1.8 && deltaS <= 0.35 && deltaV <= 0.35);
+                }, "CHROMA_OBJ", "🎨");
+            } else if (trackingEngine === 'opencv_flow' && cvInitialized && trackers.length > 0) {
+                // OpenCV 手動光流
+                try {
+                    const frameMat = new cv.Mat(ch, cw, cv.CV_8UC4);
+                    frameMat.data.set(data);
+                    trackOpticalFlow(frameMat);
+                    frameMat.delete();
+                } catch (err) {}
+            }
+        }
+
+        // --- 亮度與 HSV 色彩追蹤：高效聚類演算法 ---
+        function processPixelsTracking(data, cw, ch, filterFn, label, emoji) {
+            let candidatePoints = [];
+            const step = 6; // 步長取樣，提升 300% 效率並防止 CPU 熱鎖
+
+            for (let y = 0; y < ch; y += step) {
+                for (let x = 0; x < cw; x += step) {
+                    const idx = (y * cw + x) * 4;
+                    const r = data[idx], g = data[idx+1], b = data[idx+2];
+                    
+                    if (filterFn(r, g, b)) {
+                        // 轉換回主大 Canvas 投影座標
+                        const realX = (x / cw) * canvas.width;
+                        const realY = (y / ch) * canvas.height;
+                        candidatePoints.push({ x: realX, y: realY });
+                    }
+                }
+            }
+
+            // 對過濾出來的特徵像素點做星群聚類 (Euclidean Clustering)
+            if (candidatePoints.length > 0) {
+                const clusters = [];
+                const maxClusterDist = 95; 
+
+                for (let p of candidatePoints) {
+                    let foundCluster = false;
+                    for (let cluster of clusters) {
+                        const dist = Math.hypot(p.x - cluster.x, p.y - cluster.y);
+                        if (dist < maxClusterDist) {
+                            cluster.x = (cluster.x * cluster.count + p.x) / (cluster.count + 1);
+                            cluster.y = (cluster.y * cluster.count + p.y) / (cluster.count + 1);
+                            cluster.count++;
+                            foundCluster = true;
+                            break;
+                        }
+                    }
+                    if (!foundCluster) {
+                        clusters.push({ x: p.x, y: p.y, count: 1 });
+                    }
+                }
+
+                // 過濾並取得權重最高（元素數量最多）的前幾個群聚
+                clusters.sort((a, b) => b.count - a.count);
+                const activeClusters = clusters.filter(c => c.count > 4).slice(0, maxTargets);
+
+                // 同步至追蹤標定器
+                syncTrackersWithClusters(activeClusters, label, emoji);
+            }
+        }
+
+        function syncTrackersWithClusters(clusters, label, emoji) {
+            trackers = trackers.filter(t => t.manual || t.signalStrength > 15);
+
+            clusters.forEach(cluster => {
+                let bestMatch = null;
+                let minDist = 140;
+
+                for (let t of trackers) {
+                    if (t.manual) continue;
+                    const d = Math.hypot(cluster.x - t.cx, cluster.y - t.cy);
+                    if (d < minDist) {
+                        minDist = d;
+                        bestMatch = t;
+                    }
+                }
+
+                if (bestMatch) {
+                    bestMatch.tx = cluster.x;
+                    bestMatch.ty = cluster.y;
+                    bestMatch.signalStrength = Math.min(100, bestMatch.signalStrength + 20);
+                } else if (trackers.filter(t => !t.manual).length < maxTargets) {
+                    const id = generateId();
+                    trackers.push({
+                        id: id,
+                        label: label,
+                        emoji: emoji,
+                        tx: cluster.x,
+                        ty: cluster.y,
+                        cx: cluster.x,
+                        cy: cluster.y,
+                        size: 70, // 預設基礎尺寸
+                        signalStrength: 100,
+                        manual: false,
+                        igUserIndex: Math.floor(Math.random() * bandIgUsers.length) // 為聚類目標配發固定的 continuity 社群用戶 ID
+                    });
+                    addLog(`[PIXEL_TRACK] 鎖定${label}目標 [${id}]`, "success");
+                }
+            });
+
+            // 漸進衰減未吻合的目標
+            trackers.forEach(t => {
+                if (t.manual) return;
+                let matched = false;
+                for (let c of clusters) {
+                    if (Math.hypot(c.x - t.tx, c.y - t.ty) < 30) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    t.signalStrength -= 8;
+                }
+            });
+        }
+
+        // --- OpenCV 光流計算 ---
+        function trackOpticalFlow(frameMat) {
+            cv.cvtColor(frameMat, currGray, cv.COLOR_RGBA2GRAY);
+
+            const activeManuals = trackers.filter(t => t.manual && t.active);
+            if (activeManuals.length === 0) {
+                currGray.copyTo(prevGray);
+                return;
+            }
+
+            if (prevGray.rows === 0 || prevGray.cols === 0) {
+                currGray.copyTo(prevGray);
+                return;
+            }
+
+            const ptArray = [];
+            activeManuals.forEach(t => {
+                const rx = (t.cx / canvas.width) * offlineCanvas.width;
+                const ry = (t.cy / canvas.height) * offlineCanvas.height;
+                ptArray.push(rx, ry);
+            });
+
+            const prevPtsMat = cv.matFromArray(activeManuals.length, 1, cv.CV_32FC2, ptArray);
+
+            try {
+                cv.calcOpticalFlowPyrLK(prevGray, currGray, prevPtsMat, currPoints, statusMat, errMat);
+
+                for (let i = 0; i < activeManuals.length; i++) {
+                    const status = statusMat.data[i];
+                    if (status === 1) {
+                        const nx = currPoints.data32F[i * 2];
+                        const ny = currPoints.data32F[i * 2 + 1];
+                        
+                        activeManuals[i].tx = (nx / offlineCanvas.width) * canvas.width;
+                        activeManuals[i].ty = (ny / offlineCanvas.height) * canvas.height;
+                        activeManuals[i].signalStrength = 100;
+                    } else {
+                        activeManuals[i].signalStrength -= 8;
+                        if (activeManuals[i].signalStrength <= 15) {
+                            activeManuals[i].active = false;
+                            addLog(`[OPENCV] 失去目標鎖定: ${activeManuals[i].id}`, "warn");
+                        }
+                    }
+                }
+            } catch (err) {
+            } finally {
+                prevPtsMat.delete();
+            }
+
+            currGray.copyTo(prevGray);
+        }
+
+        // --- 同步 MediaPipe 檢測結果到 trackers 陣列 ---
+        function syncWithMediaPipe(detections, type) {
+            const scaleX = canvas.width / video.videoWidth;
+            const scaleY = canvas.height / video.videoHeight;
+            const mappedDetections = [];
+
+            detections.forEach(det => {
+                const box = det.boundingBox;
+                if (!box) return;
+
+                const x = box.originX * scaleX;
+                const y = box.originY * scaleY;
+                const w = box.width * scaleX;
+                const h = box.height * scaleY;
+
+                const cx = x + w / 2;
+                const cy = y + h / 2;
+                const size = Math.max(w, h, 40);
+
+                let label = type === "face" ? "FACE" : (det.categories[0]?.categoryName || "OBJECT");
+                label = label.toUpperCase();
+
+                mappedDetections.push({ cx, cy, size, label });
+            });
+
+            trackers = trackers.filter(t => t.manual || t.signalStrength > 15);
+
+            mappedDetections.slice(0, maxTargets).forEach(det => {
+                let bestMatch = null;
+                let minDist = 160;
+
+                for (let t of trackers) {
+                    if (t.manual) continue;
+                    const d = Math.hypot(det.cx - t.cx, det.cy - t.cy);
+                    if (d < minDist) {
+                        minDist = d;
+                        bestMatch = t;
+                    }
+                }
+
+                if (bestMatch) {
+                    bestMatch.tx = det.cx;
+                    bestMatch.ty = det.cy;
+                    bestMatch.size = det.size;
+                    bestMatch.signalStrength = Math.min(100, bestMatch.signalStrength + 15);
+                } else if (trackers.filter(t => !t.manual).length < maxTargets) {
+                    const id = generateId();
+                    trackers.push({
+                        id: id,
+                        label: det.label,
+                        emoji: getEmojiForLabel(det.label),
+                        tx: det.cx,
+                        ty: det.cy,
+                        cx: det.cx,
+                        cy: det.cy,
+                        size: det.size,
+                        signalStrength: 100,
+                        manual: false,
+                        igUserIndex: Math.floor(Math.random() * bandIgUsers.length) // 為 MediaPipe 目標配發固定的 continuity 社群用戶 ID
+                    });
+                    addLog(`[MEDIA_PIPE] 鎖定: ${det.label} [${id}]`, "success");
+                }
+            });
+
+            trackers.forEach(t => {
+                if (t.manual) return;
+                let matched = false;
+                for (let det of mappedDetections) {
+                    if (Math.hypot(det.cx - t.tx, det.cy - t.ty) < 25) {
+                        matched = true;
+                        break;
+                    }
+                }
+                if (!matched) {
+                    t.signalStrength -= 5;
+                }
+            });
+        }
+
+        // --- 表情符號類別配置對應 ---
+        function getEmojiForLabel(label) {
+            const map = {
+                "PERSON": "👤",
+                "FACE": "👁️",
+                "CELL PHONE": "📱",
+                "LAPTOP": "💻",
+                "CUP": "☕",
+                "CHAIR": "🪑",
+                "BOOK": "📖",
+                "BOTTLE": "🍾",
+                "DOG": "🐶",
+                "CAT": "🐱",
+                "CAR": "🚗",
+                "TRUCK": "🚛"
+            };
+            return map[label] || availableEmojis[Math.floor(Math.random() * availableEmojis.length)];
+        }
+
+        // --- 核心：四元樹 (Quadtree) 像素剖分渲染器 ---
+        function renderQuadtreeEffect(tX, tY, size) {
+            if (offlineCanvas.width === 0) return;
+
+            const half = size / 2;
+            
+            // 將畫布投影座標反向轉換回離線分析 Canvas (480x270) 的像素座標
+            const ratioX = offlineCanvas.width / canvas.width;
+            const ratioY = offlineCanvas.height / canvas.height;
+
+            const sx = Math.floor((tX - half) * ratioX);
+            const sy = Math.floor((tY - half) * ratioY);
+            const sw = Math.floor(size * ratioX);
+            const sh = Math.floor(size * ratioY);
+
+            // 越界安全保護
+            if (sx < 0 || sy < 0 || sx + sw > offlineCanvas.width || sy + sh > offlineCanvas.height || sw <= 4 || sh <= 4) {
+                return;
+            }
+
+            // 取得該區塊的像素數據
+            const imgData = offlineCtx.getImageData(sx, sy, sw, sh);
+            
+            // 遞迴繪製四元樹
+            ctx.save();
+            drawQuadtreeNode(imgData.data, tX - half, tY - half, size, size, 0, 0, sw, sh, 0);
+            ctx.restore();
+        }
+
+        function drawQuadtreeNode(pixelData, x, y, w, h, sx, sy, sw, sh, depth) {
+            const stats = getCellStats(pixelData, sx, sy, sw, sh);
+
+            // 分裂條件
+            if (depth < options.qtMaxDepth && stats.variance > options.qtThreshold && sw >= 4 && sh >= 4) {
+                const hw = sw / 2;
+                const hh = sh / 2;
+                const halfW = w / 2;
+                const halfH = h / 2;
+
+                drawQuadtreeNode(pixelData, x, y, halfW, halfH, sx, sy, hw, hh, depth + 1);
+                drawQuadtreeNode(pixelData, x + halfW, y, halfW, halfH, sx + hw, sy, hw, hh, depth + 1);
+                drawQuadtreeNode(pixelData, x, y + halfH, halfW, halfH, sx, sy + hh, hw, hh, depth + 1);
+                drawQuadtreeNode(pixelData, x + halfW, y + halfH, halfW, halfH, sx + hw, sy + hh, hw, hh, depth + 1);
+            } else {
+                ctx.fillStyle = `rgba(${stats.r}, ${stats.g}, ${stats.b}, ${options.qtOpacity})`;
+                ctx.fillRect(x, y, w, h);
+
+                ctx.strokeStyle = colors.primaryAlpha;
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(x, y, w, h);
+            }
+        }
+
+        function getCellStats(pixelData, sx, sy, sw, sh) {
+            const points = [
+                { x: Math.floor(sx + sw * 0.25), y: Math.floor(sy + sh * 0.25) },
+                { x: Math.floor(sx + sw * 0.75), y: Math.floor(sy + sh * 0.25) },
+                { x: Math.floor(sx + sw * 0.5),  y: Math.floor(sy + sh * 0.5)  },
+                { x: Math.floor(sx + sw * 0.25), y: Math.floor(sy + sh * 0.75) },
+                { x: Math.floor(sx + sw * 0.75), y: Math.floor(sy + sh * 0.75) }
+            ];
+
+            let rSum = 0, gSum = 0, bSum = 0;
+            let grays = [];
+
+            for (let pt of points) {
+                const px = Math.max(0, Math.min(pt.x, Math.floor(sw - 1)));
+                const py = Math.max(0, Math.min(pt.y, Math.floor(sh - 1)));
+
+                const idx = (py * Math.floor(sw) + px) * 4;
+                const r = pixelData[idx];
+                const g = pixelData[idx+1];
+                const b = pixelData[idx+2];
+
+                rSum += r; gSum += g; bSum += b;
+                grays.push(0.299 * r + 0.587 * g + 0.114 * b);
+            }
+
+            const rAvg = rSum / 5;
+            const gAvg = gSum / 5;
+            const bAvg = bSum / 5;
+            const grayAvg = (rAvg + gAvg + bAvg) / 3;
+
+            let variance = 0;
+            for (let g of grays) {
+                variance += Math.abs(g - grayAvg);
+            }
+
+            return {
+                r: Math.round(rAvg),
+                g: Math.round(gAvg),
+                b: Math.round(bAvg),
+                variance: variance / 5
+            };
+        }
+
+        // --- 核心：Instagram 貼文框動態 DOM 渲染系統 (採用固定靜態比例縮放，對標範例圖 100% 完美不跑版) ---
+        function updateInstagramOverlays() {
+            const igContainer = document.getElementById('ig-overlay-container');
+            
+            // 若未啟用，徹底清除疊加 DOM 節點
+            if (!options.enableIGFrame) {
+                igContainer.innerHTML = '';
+                return;
+            }
+
+            const existingDivs = Array.from(igContainer.children);
+            const currentTrackerIds = trackers.map(t => t.id);
+
+            // 1. 移除已經消失的追蹤物件 DOM 節點
+            existingDivs.forEach(div => {
+                if (!currentTrackerIds.includes(div.dataset.trackerId)) {
+                    div.remove();
+                }
+            });
+
+            // 2. 更新或新建貼文框 DOM
+            trackers.forEach(t => {
+                let div = igContainer.querySelector(`[data-tracker-id="${t.id}"]`);
+                const size = t.size * options.boxScale;
+                
+                if (!div) {
+                    div = document.createElement('div');
+                    div.dataset.trackerId = t.id;
+                    div.className = "ig-post-card pointer-events-auto";
+                    igContainer.appendChild(div);
+                }
+
+                // 核心硬體加速變形：精確將靜態 400x600 的卡片頂點定位，並根據實際追蹤大小 size 進行整體 scale 縮放！
+                // 這保證了所有內部元素、文字大小、間距對齊關係永久固定，不會因為響應式包裹而亂掉。
+                const left = t.cx - 200;
+                const top = t.cy - 256; // 56px(Header) + 200px(一半的照片區) = 256px
+                const scale = size / 400;
+
+                div.style.transform = `translate3d(${left}px, ${top}px, 0) scale(${scale})`;
+                div.style.opacity = t.signalStrength / 100;
+
+                // 3. 高效率快取比對更新：只有當樣式與資料真實變更時才觸發 innerHTML 渲染，其餘時間僅進行 hardware translate
+                const userIndex = (t.igUserIndex !== undefined) ? t.igUserIndex : 0;
+                const user = bandIgUsers[userIndex];
+                const activeComment = options.commentType === 'praise' ? user.praise : user.troll;
+                
+                const cacheKey = `${options.igTheme}_${options.commentType}_${options.invertBoxColor ? 'inv' : 'nor'}_${user.username}`;
+                
+                if (div.dataset.cacheKey !== cacheKey) {
+                    div.dataset.cacheKey = cacheKey;
+
+                    // 樣式色彩配置
+                    let bg, border, text, subtext, heartColor, dotsColorActive, dotsColorInactive, avBorder;
+                    
+                    if (options.igTheme === 'dark') {
+                        bg = 'rgba(11, 15, 25, 0.96)'; // 極致暗色
+                        border = 'rgba(16, 185, 129, 0.25)';
+                        text = '#f8fafc';
+                        subtext = '#94a3b8';
+                        heartColor = '#ef4444';
+                        dotsColorActive = '#3b82f6'; // 經典貼圖中的中間藍點
+                        dotsColorInactive = '#475569';
+                        avBorder = 'rgba(16, 185, 129, 0.2)';
+                    } else {
+                        bg = 'rgba(255, 255, 255, 0.98)'; // 經典白 (對標 Screenshot_20260708_122625)
+                        border = 'rgba(0, 0, 0, 0.08)';
+                        text = '#262626';
+                        subtext = '#737373';
+                        heartColor = '#ff3040'; // 官方紅
+                        dotsColorActive = '#0095f6'; // 官方藍
+                        dotsColorInactive = '#dbdbdb';
+                        avBorder = 'rgba(0, 0, 0, 0.05)';
+                    }
+
+                    // 差值混合混合模式
+                    if (options.invertBoxColor) {
+                        div.style.mixBlendMode = 'difference';
+                        bg = 'rgba(0, 0, 0, 0.9)';
+                        border = 'rgba(255, 255, 255, 0.3)';
+                        text = '#ffffff';
+                        subtext = '#b8b8b8';
+                        heartColor = '#ffffff';
+                        dotsColorActive = '#ffffff';
+                        dotsColorInactive = '#555555';
+                        avBorder = 'rgba(255, 255, 255, 0.2)';
+                    } else {
+                        div.style.mixBlendMode = 'normal';
+                    }
+
+                    // 100% 像素對齊與 Font Awesome 完美套用
+                    // 【注意】此處 div (主容器) 必須保持完全透明 (transparent)，這樣中間透明的照片區才能完美透視底下的視訊
+                    div.style.backgroundColor = 'transparent';
+                    div.style.borderColor = border;
+
+                    div.innerHTML = `
+                        <!-- Header (56px) - 獨立套用背景色 bg -->
+                        <div class="ig-header" style="border-color: ${border}; background-color: ${bg};">
+                            <div class="ig-avatar" style="background-color: ${user.avatarColor}; border: 1px solid ${avBorder};">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <span class="ig-username" style="color: ${text}">${user.username}</span>
+                            <div class="ig-menu-dots" style="color: ${text}">
+                                <i class="fa-solid fa-ellipsis"></i>
+                            </div>
+                        </div>
+
+                        <!-- 透明照片區：完美的 400x400 px 照片透視口 (確保為完全透明，使底層 Canvas 的四元樹/負片渲染完美透射) -->
+                        <div class="ig-photo-area"></div>
+
+                        <!-- Footer (144px) - 獨立套用背景色 bg -->
+                        <div class="ig-footer" style="background-color: ${bg}; border-top: 1px solid ${border}">
+                            <!-- 按鈕排 -->
+                            <div class="ig-actions">
+                                <div class="ig-left-actions">
+                                    <span class="ig-icon-btn" style="color: ${heartColor}">
+                                        <i class="fa-solid fa-heart"></i>
+                                    </span>
+                                    <span class="ig-icon-btn" style="color: ${text}">
+                                        <i class="fa-regular fa-comment"></i>
+                                    </span>
+                                    <span class="ig-icon-btn" style="color: ${text}">
+                                        <i class="fa-regular fa-paper-plane" style="transform: rotate(-10deg);"></i>
+                                    </span>
+                                </div>
+                                
+                                <!-- 中間分頁點：對標參考圖 -->
+                                <div class="ig-carousel-dots">
+                                    <span class="ig-carousel-dot ig-dot-inactive-2" style="background-color: ${dotsColorInactive}"></span>
+                                    <span class="ig-carousel-dot ig-dot-active" style="background-color: ${dotsColorActive}"></span>
+                                    <span class="ig-carousel-dot ig-dot-inactive-1" style="background-color: ${dotsColorInactive}"></span>
+                                </div>
+
+                                <span class="ig-icon-btn ig-bookmark-btn" style="color: ${text}">
+                                    <i class="fa-regular fa-bookmark"></i>
+                                </span>
+                            </div>
+
+                            <!-- 貼文詳情與留言 -->
+                            <div class="ig-details-block">
+                                <div class="ig-likes" style="color: ${text}">
+                                    ${user.likes} likes
+                                </div>
+                                <div class="ig-caption" style="color: ${text}">
+                                    <span class="ig-caption-name">${user.username}</span>${user.caption}
+                                </div>
+                                <div class="ig-comment" style="color: ${subtext}">
+                                    <span class="ig-comment-name" style="color: ${text}">@troll_bot</span>${activeComment}
+                                </div>
+                                <div class="ig-time" style="color: ${subtext}">
+                                    5 DAYS AGO • MV_HUD_RECORD
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // --- 繪圖與渲染迴圈 ---
+        function animate(timestamp) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (options.showGrid) {
+                drawGrid();
+            }
+
+            // 執行背景影像分析
+            processFrame(timestamp);
+
+            // 3. 調用動態 HTML Instagram 貼文疊加層繪製 (現在中央區塊已被完美鏤空)
+            updateInstagramOverlays();
+
+            // 星座連線模式
+            if (options.showLines && trackers.length > 1) {
+                ctx.strokeStyle = colors.primaryAlpha;
+                ctx.lineWidth = options.lineWidth;
+                ctx.beginPath();
+                for (let i = 0; i < trackers.length; i++) {
+                    for (let j = i + 1; j < trackers.length; j++) {
+                        const dist = Math.hypot(trackers[i].cx - trackers[j].cx, trackers[i].cy - trackers[j].cy);
+                        if (dist < 260) {
+                            ctx.moveTo(trackers[i].cx, trackers[i].cy);
+                            ctx.lineTo(trackers[j].cx, trackers[j].cy);
+                        }
+                    }
+                }
+                ctx.stroke();
+            }
+
+            // 繪製與處理精細科幻追蹤標框 (當啟用貼文框時，只在底層繪製四元樹或負片，不畫常規 HUD 角點)
+            trackers.forEach((t, idx) => {
+                t.cx += (t.tx - t.cx) * lerpAmount;
+                t.cy += (t.ty - t.cy) * lerpAmount;
+
+                const breathe = Math.sin(timestamp * 0.004 + idx) * 2;
+                const size = (t.size + breathe) * options.boxScale;
+
+                if (options.enableIGFrame) {
+                    // 1. 如果啟用 IG 貼文框：僅在底層 Canvas 渲染影像解構特效，HTML 的透明中央部分會精確透光
+                    if (options.enableQuadtree) {
+                        renderQuadtreeEffect(t.cx, t.cy, size);
+                    } else if (options.invertContent) {
+                        ctx.save();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.globalCompositeOperation = 'difference';
+                        ctx.fillRect(t.cx - (size/2), t.cy - (size/2), size, size);
+                        ctx.restore();
+                    }
+                } else {
+                    // 2. 否則進行常規 HUD 科技風角點追蹤框渲染
+                    ctx.save();
+                    ctx.globalAlpha = t.signalStrength / 100;
+
+                    // 底層四元樹
+                    if (options.enableQuadtree) {
+                        renderQuadtreeEffect(t.cx, t.cy, size);
+                    }
+
+                    const half = size / 2;
+                    const len = size * 0.25;
+
+                    // 框內負片
+                    if (options.invertContent) {
+                        ctx.save();
+                        ctx.fillStyle = '#ffffff';
+                        ctx.globalCompositeOperation = 'difference';
+                        ctx.fillRect(t.cx - half, t.cy - half, size, size);
+                        ctx.restore();
+                    }
+
+                    // 框線差值對比
+                    if (options.invertBoxColor) {
+                        ctx.globalCompositeOperation = 'difference';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.fillStyle = '#ffffff';
+                    } else {
+                        ctx.globalCompositeOperation = 'source-over';
+                        ctx.strokeStyle = colors.primary;
+                        ctx.fillStyle = colors.accent;
+                    }
+                    ctx.lineWidth = options.lineWidth;
+
+                    // 繪製 ┌ ┐ └ ┘ 經典外角框
+                    ctx.beginPath();
+                    // 左上
+                    ctx.moveTo(t.cx - half, t.cy - half + len);
+                    ctx.lineTo(t.cx - half, t.cy - half);
+                    ctx.lineTo(t.cx - half + len, t.cy - half);
+                    // 右上
+                    ctx.moveTo(t.cx + half - len, t.cy - half);
+                    ctx.lineTo(t.cx + half, t.cy - half);
+                    ctx.lineTo(t.cx + half, t.cy - half + len);
+                    // 右下
+                    ctx.moveTo(t.cx + half, t.cy + half - len);
+                    ctx.lineTo(t.cx + half, t.cy + half);
+                    ctx.lineTo(t.cx - half + len, t.cy + half);
+                    // 左下
+                    ctx.moveTo(t.cx - half + len, t.cy + half);
+                    ctx.lineTo(t.cx - half, t.cy + half);
+                    ctx.lineTo(t.cx - half, t.cy + half - len);
+                    ctx.stroke();
+
+                    // D. 標記與等寬 Console 字型標籤 (座標、ID 與表情)
+                    ctx.font = "11px 'Share Tech Mono', monospace";
+                    let textY = t.cy - half - 6;
+
+                    if (options.showEmojis && t.emoji) {
+                        ctx.save();
+                        ctx.font = "16px Arial";
+                        ctx.fillText(t.emoji, t.cx - 8, textY - 8);
+                        ctx.restore();
+                        textY -= 18;
+                    }
+
+                    ctx.font = "11px 'Share Tech Mono', monospace";
+                    let metaText = "";
+                    if (options.showIds) metaText += `[${t.id}] `;
+                    metaText += t.label;
+                    ctx.fillText(metaText, t.cx - half, textY);
+
+                    if (options.showCoords) {
+                        const coordY = t.cy + half + 14;
+                        ctx.fillText("X:" + t.cx.toFixed(0).padStart(4, '0') + " Y:" + t.cy.toFixed(0).padStart(4, '0'), t.cx - half, coordY);
+                        ctx.fillText("LOCK_SIG:" + Math.round(t.signalStrength) + "%", t.cx - half, coordY + 12);
+                    }
+
+                    ctx.restore();
+                }
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        function drawGrid() {
+            const gridSize = 50;
+            ctx.strokeStyle = colors.primaryAlpha;
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+        }
+
+        // --- 控制台面板互動與鍵盤事件 [H] ---
+        const controlPanel = document.getElementById('control-panel');
+        const btnMinimize = document.getElementById('btn-minimize');
+        const btnHideConsole = document.getElementById('btn-hide-console');
+        const panelContent = document.getElementById('panel-content');
+
+        let isConsoleHidden = false;
+        let isConsoleMinimized = false;
+
+        function toggleConsole() {
+            isConsoleHidden = !isConsoleHidden;
+            if (isConsoleHidden) {
+                controlPanel.classList.add('hidden');
+                addLog("控制台完全隱藏。按下鍵盤 [H] 鍵可隨時喚醒面板並結束 MV 拍攝模式。", "warn");
+            } else {
+                controlPanel.classList.remove('hidden');
+                addLog("控制台面板還原。", "success");
+            }
+        }
+
+        btnHideConsole.addEventListener('click', toggleConsole);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'h' || e.key === 'H') {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+                toggleConsole();
+            }
+        });
+
+        btnMinimize.addEventListener('click', () => {
+            isConsoleMinimized = !isConsoleMinimized;
+            if (isConsoleMinimized) {
+                panelContent.style.display = 'none';
+                btnMinimize.innerHTML = '<i class="fa-solid fa-plus"></i>';
+            } else {
+                panelContent.style.display = 'block';
+                btnMinimize.innerHTML = '<i class="fa-solid fa-minus"></i>';
+            }
+        });
+
+        // 拖曳控制面板 (阻斷事件傳遞提升縮小、隱藏按鈕靈敏度)
+        let isDragging = false;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        const panelHeader = document.getElementById('panel-header');
+
+        btnMinimize.addEventListener('mousedown', (e) => e.stopPropagation());
+        btnHideConsole.addEventListener('mousedown', (e) => e.stopPropagation());
+
+        panelHeader.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragOffsetX = e.clientX - controlPanel.offsetLeft;
+            dragOffsetY = e.clientY - controlPanel.offsetTop;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            controlPanel.style.left = `${e.clientX - dragOffsetX}px`;
+            controlPanel.style.top = `${e.clientY - dragOffsetY}px`;
+            controlPanel.style.right = 'auto';
+        });
+
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        // --- 視訊來源引導與檔案處理 ---
+        const portalVideoUpload = document.getElementById('portal-video-upload');
+        const btnPortalWebcam = document.getElementById('btn-portal-webcam');
+        const btnPortalDefault = document.getElementById('btn-portal-default');
+
+        portalVideoUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                stopWebcam();
+                video.src = URL.createObjectURL(file);
+                startSystemTracking();
+                video.play();
+                addLog(`上傳自訂影片: ${file.name}`, "success");
+            }
+        });
+
+        btnPortalWebcam.addEventListener('click', async () => {
+            try {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    stopWebcam();
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                    video.srcObject = stream;
+                    startSystemTracking();
+                    video.play();
+                    addLog("已切換至現場攝影機畫面！", "success");
+                } else {
+                    addLog("此環境不支援網路攝影機鏡頭。", "error");
+                }
+            } catch (err) {
+                addLog(`攝影機載入失敗: ${err.message}`, "error");
+            }
+        });
+
+        btnPortalDefault.addEventListener('click', () => {
+            stopWebcam();
+            video.src = "20260707-1124-04.1987262.mp4";
+            
+            video.onerror = function() {
+                video.src = "https://assets.mixkit.co/videos/preview/mixkit-tunnel-of-futuristic-blue-lights-42411-large.mp4";
+                video.onerror = null; 
+            };
+
+            startSystemTracking();
+            video.play();
+            addLog("使用系統預設追蹤影片素材。", "success");
+        });
+
+        // --- 主面板內的來源控制連動 ---
+        const btnSourceDefault = document.getElementById('btn-source-default');
+        const btnSourceWebcam = document.getElementById('btn-source-webcam');
+        const videoUpload = document.getElementById('video-upload');
+
+        btnSourceDefault.addEventListener('click', () => {
+            stopWebcam();
+            video.src = "20260707-1124-04.1987262.mp4";
+            video.play();
+            addLog("切換至預設視訊影片源。", "success");
+        });
+
+        btnSourceWebcam.addEventListener('click', async () => {
+            try {
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    stopWebcam();
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                    video.srcObject = stream;
+                    video.play();
+                    addLog("已切換至現場攝影機畫面！", "success");
+                }
+            } catch (err) {
+                addLog(`攝影機載入失敗: ${err.message}`, "error");
+            }
+        });
+
+        videoUpload.addEventListener('change', (e) => {
+            stopWebcam();
+            const file = e.target.files[0];
+            if (file) {
+                video.src = URL.createObjectURL(file);
+                video.play();
+                addLog(`已成功更換現場影片: ${file.name}`, "success");
+            }
+        });
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+            }
+        }
+
+        // --- 參數微調設定監聽器 ---
+        const selectEngine = document.getElementById('select-engine');
+        const rangeThreshold = document.getElementById('range-threshold');
+        const rangeMaxTargets = document.getElementById('range-max-targets');
+        const rangeSmooth = document.getElementById('range-smooth');
+        const rangeLineWidth = document.getElementById('range-linewidth');
+        const rangeBoxScale = document.getElementById('range-box-scale');
+
+        // 亮度、色彩、四元樹、社群參數監聽
+        const rangeLumMin = document.getElementById('range-lum-min');
+        const rangeLumMax = document.getElementById('range-lum-max');
+        const pickerTargetColor = document.getElementById('picker-target-color');
+        const rangeColorTol = document.getElementById('range-color-tol');
+        const chkQuadtree = document.getElementById('chk-quadtree');
+        const rangeQtDepth = document.getElementById('range-qt-depth');
+        const rangeQtThreshold = document.getElementById('range-qt-threshold');
+        const rangeQtOpacity = document.getElementById('range-qt-opacity');
+        const chkInvertContent = document.getElementById('chk-invert-content');
+        const chkInvertBox = document.getElementById('chk-invert-box');
+
+        const chkEnableIGFrame = document.getElementById('chk-enable-ig-frame');
+        const selectIGTheme = document.getElementById('select-ig-theme');
+        const selectCommentType = document.getElementById('select-comment-type');
+
+        selectEngine.addEventListener('change', (e) => {
+            trackingEngine = e.target.value;
+            trackers = [];
+            addLog(`切換追蹤引擎至: ${trackingEngine.toUpperCase()}`, "success");
+        });
+
+        // 亮度區間調節
+        rangeLumMin.addEventListener('input', (e) => {
+            filterLumMin = parseInt(e.target.value);
+            document.getElementById('val-lum-min').innerText = filterLumMin;
+        });
+        rangeLumMax.addEventListener('input', (e) => {
+            filterLumMax = parseInt(e.target.value);
+            document.getElementById('val-lum-max').innerText = filterLumMax;
+        });
+
+        // 色彩過濾調節
+        pickerTargetColor.addEventListener('input', (e) => {
+            targetColorHex = e.target.value;
+            updateTargetColorHSV();
+            addLog(`更新鎖定色彩：${targetColorHex.toUpperCase()}`);
+        });
+        rangeColorTol.addEventListener('input', (e) => {
+            colorTolerance = parseInt(e.target.value);
+            document.getElementById('val-color-tol').innerText = colorTolerance;
+        });
+
+        // 追蹤框比例縮放
+        rangeBoxScale.addEventListener('input', (e) => {
+            options.boxScale = parseFloat(e.target.value);
+            document.getElementById('val-box-scale').innerText = `${options.boxScale.toFixed(1)} x`;
+        });
+
+        // 四元樹不透明度與剖分調節
+        chkQuadtree.addEventListener('change', (e) => {
+            options.enableQuadtree = e.target.checked;
+        });
+        rangeQtDepth.addEventListener('input', (e) => {
+            options.qtMaxDepth = parseInt(e.target.value);
+            document.getElementById('val-qt-depth').innerText = options.qtMaxDepth;
+        });
+        rangeQtThreshold.addEventListener('input', (e) => {
+            options.qtThreshold = parseInt(e.target.value);
+            document.getElementById('val-qt-threshold').innerText = options.qtThreshold;
+        });
+        rangeQtOpacity.addEventListener('input', (e) => {
+            options.qtOpacity = parseInt(e.target.value) / 100;
+            document.getElementById('val-qt-opacity').innerText = `${e.target.value}%`;
+        });
+
+        // 負片與社群濾鏡效果切換
+        chkInvertContent.addEventListener('change', (e) => {
+            options.invertContent = e.target.checked;
+            addLog(options.invertContent ? "啟用框內負片效果。" : "停用框內負片效果。");
+        });
+        chkInvertBox.addEventListener('change', (e) => {
+            options.invertBoxColor = e.target.checked;
+            addLog(options.invertBoxColor ? "啟用框線差值負片模式。" : "恢復正常框線色彩模式。");
+        });
+
+        chkEnableIGFrame.addEventListener('change', (e) => {
+            options.enableIGFrame = e.target.checked;
+            if (!options.enableIGFrame) {
+                document.getElementById('ig-overlay-container').innerHTML = ''; // 徹底清除 DOM
+            }
+            addLog(options.enableIGFrame ? "已解鎖並套用 Instagram 貼文框。" : "恢復預設科技風 HUD 角角框。");
+        });
+        selectIGTheme.addEventListener('change', (e) => {
+            options.igTheme = e.target.value;
+            addLog(`貼文介面色調已變更為: ${options.igTheme.toUpperCase()}`);
+        });
+        selectCommentType.addEventListener('change', (e) => {
+            options.commentType = e.target.value;
+            addLog(`留言極性已變更為: ${options.commentType === 'praise' ? '樂迷擁護 (Fans)' : '酸民嘲諷 (Haters)'}`);
+        });
+
+        // 基礎參數
+        rangeThreshold.addEventListener('input', (e) => {
+            scoreThreshold = parseFloat(e.target.value);
+            document.getElementById('val-threshold').innerText = scoreThreshold;
+            if (objectDetector) {
+                objectDetector.setOptions({ scoreThreshold: scoreThreshold });
+            }
+        });
+
+        rangeMaxTargets.addEventListener('input', (e) => {
+            maxTargets = parseInt(e.target.value);
+            document.getElementById('val-max-targets').innerText = maxTargets;
+        });
+
+        rangeSmooth.addEventListener('input', (e) => {
+            lerpAmount = parseFloat(e.target.value);
+            document.getElementById('val-smooth').innerText = lerpAmount;
+        });
+
+        rangeLineWidth.addEventListener('input', (e) => {
+            options.lineWidth = parseInt(e.target.value);
+            document.getElementById('val-linewidth').innerText = `${options.lineWidth} px`;
+        });
+
+        document.getElementById('chk-show-coords').addEventListener('change', (e) => options.showCoords = e.target.checked);
+        document.getElementById('chk-show-ids').addEventListener('change', (e) => options.showIds = e.target.checked);
+        document.getElementById('chk-show-lines').addEventListener('change', (e) => options.showLines = e.target.checked);
+        document.getElementById('chk-show-emojis').addEventListener('change', (e) => options.showEmojis = e.target.checked);
+        document.getElementById('chk-show-grid').addEventListener('change', (e) => options.showGrid = e.target.checked);
+
+        document.getElementById('btn-reset-trackers').addEventListener('click', () => {
+            trackers = [];
+            document.getElementById('ig-overlay-container').innerHTML = ''; // 清空疊加的貼文 DOM
+            addLog("所有追蹤標記物件已手動清空。", "warn");
+        });
+
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => {
+                    addLog(`全螢幕切換失敗: ${err.message}`, "error");
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        // --- 色彩風格切換 ---
+        const colorButtons = document.querySelectorAll('.btn-color');
+        colorButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                colorButtons.forEach(b => {
+                    b.classList.remove('bg-emerald-950/80', 'border-2', 'border-emerald-500', 'bg-red-950/80', 'border-red-500', 'bg-blue-950/80', 'border-blue-500', 'bg-amber-950/80', 'border-amber-500');
+                    b.classList.add('bg-slate-900', 'border', 'border-slate-700');
+                });
+                
+                const chosenColor = btn.getAttribute('data-color');
+                document.body.classList.remove('neon-shadow-green', 'neon-shadow-red', 'neon-shadow-blue', 'neon-shadow-amber');
+
+                if (chosenColor === 'green') {
+                    colors.primary = 'rgba(16, 185, 129, 1)';
+                    colors.primaryAlpha = 'rgba(16, 185, 129, 0.15)';
+                    colors.accent = '#34d399';
+                    document.body.classList.add('neon-shadow-green');
+                    btn.classList.add('bg-emerald-950/80', 'border-2', 'border-emerald-500');
+                    document.body.style.color = '#34d399';
+                } else if (chosenColor === 'red') {
+                    colors.primary = 'rgba(239, 68, 68, 1)';
+                    colors.primaryAlpha = 'rgba(239, 68, 68, 0.15)';
+                    colors.accent = '#f87171';
+                    document.body.classList.add('neon-shadow-red');
+                    btn.classList.add('bg-red-950/80', 'border-2', 'border-red-500');
+                    document.body.style.color = '#f87171';
+                } else if (chosenColor === 'blue') {
+                    colors.primary = 'rgba(59, 130, 246, 1)';
+                    colors.primaryAlpha = 'rgba(59, 130, 246, 0.15)';
+                    colors.accent = '#60a5fa';
+                    document.body.classList.add('neon-shadow-blue');
+                    btn.classList.add('bg-blue-950/80', 'border-2', 'border-blue-500');
+                    document.body.style.color = '#60a5fa';
+                } else if (chosenColor === 'amber') {
+                    colors.primary = 'rgba(245, 158, 11, 1)';
+                    colors.primaryAlpha = 'rgba(245, 158, 11, 0.15)';
+                    colors.accent = '#fbbf24';
+                    document.body.classList.add('neon-shadow-amber');
+                    btn.classList.add('bg-amber-950/80', 'border-2', 'border-amber-500');
+                    document.body.style.color = '#fbbf24';
+                }
+
+                addLog(`系統主題色調切換至: ${chosenColor.toUpperCase()}`);
+            });
+        });
+
+    </script>
+</body>
+</html>

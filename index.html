@@ -8,8 +8,8 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Google Material Icons -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Font Awesome 6.5.1 (包含官方 Threads 品牌圖示) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   
   <!-- Google Fonts: Noto Sans TC -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,25 +78,26 @@
   <!-- 頂部導航欄 (在拍攝模式時可隱藏) -->
   <header id="appHeader" class="sticky top-0 z-40 bg-threadsDark/95 backdrop-blur-md border-b border-threadsBorder/40 transition-all duration-300">
     <div class="max-w-[620px] mx-auto px-4 h-16 flex items-center justify-between">
-      <!-- Threads Logo 替換為 Google Material Icons 的 Alternate email 圖示 -->
+      <!-- Threads 官方 Logo 採用 Font Awesome Brands Icon -->
       <div class="w-8 h-8 flex items-center justify-center text-threadsText cursor-pointer" title="Threads">
-        <i class="material-icons text-[28px]">alternate_email</i>
+        <i class="fa-brands fa-threads text-[28px]"></i>
       </div>
 
       <!-- 導航選單 (中央) -->
       <nav class="flex items-center space-x-12 text-threadsLightGray">
-        <button class="hover:text-threadsText text-threadsText transition-colors"><i class="material-icons text-[26px]">home</i></button>
-        <button class="hover:text-threadsText transition-colors"><i class="material-icons text-[26px]">search</i></button>
+        <button class="hover:text-threadsText text-threadsText transition-colors"><i class="fa-solid fa-house text-[21px]"></i></button>
+        <!-- 點擊此按鈕將跳轉至同目錄下的 cam.html -->
+        <button onclick="window.location.href='cam.html'" class="hover:text-threadsText transition-colors" title="搜尋 / 相機"><i class="fa-solid fa-magnifying-glass text-[21px]"></i></button>
         <!-- 點擊此按鈕將跳轉至同目錄下的 live.html -->
-        <button onclick="window.location.href='live.html'" class="hover:text-threadsText transition-colors" title="發佈新貼文"><i class="material-icons text-[26px]">edit_square</i></button>
-        <button class="hover:text-threadsText transition-colors"><i class="material-icons text-[26px]">favorite_border</i></button>
-        <button class="hover:text-threadsText transition-colors"><i class="material-icons text-[26px]">person_outline</i></button>
+        <button onclick="window.location.href='live.html'" class="hover:text-threadsText transition-colors" title="發佈新貼文"><i class="fa-regular fa-pen-to-square text-[21px]"></i></button>
+        <button class="hover:text-threadsText transition-colors"><i class="fa-regular fa-heart text-[21px]"></i></button>
+        <button class="hover:text-threadsText transition-colors"><i class="fa-regular fa-user text-[21px]"></i></button>
       </nav>
 
       <!-- 右側菜單 -->
       <div class="flex items-center space-x-4">
         <button onclick="toggleControlPanel()" class="w-8 h-8 rounded-full bg-neutral-800/80 hover:bg-neutral-700 flex items-center justify-center text-threadsLightGray hover:text-threadsText transition-all" title="導演控制台">
-          <i class="material-icons text-[18px]">tune</i>
+          <i class="fa-solid fa-sliders text-[16px]"></i>
         </button>
       </div>
     </div>
@@ -128,10 +129,10 @@
       </div>
       <div class="flex items-center space-x-2">
         <button onclick="minimizePanel()" class="hover:bg-neutral-800 text-neutral-400 hover:text-white p-1 rounded transition-colors">
-          <i class="material-icons text-[16px]" id="minIcon">remove</i>
+          <i class="fa-solid fa-minus text-[14px]" id="minIcon"></i>
         </button>
         <button onclick="toggleControlPanel()" class="hover:bg-neutral-800 text-neutral-400 hover:text-red-500 p-1 rounded transition-colors">
-          <i class="material-icons text-[16px]">close</i>
+          <i class="fa-solid fa-xmark text-[14px]"></i>
         </button>
       </div>
     </div>
@@ -144,11 +145,11 @@
         <h4 class="text-neutral-400 font-bold mb-2 uppercase tracking-wide">🎬 拍攝模式 (最重要)</h4>
         <div class="grid grid-cols-2 gap-2">
           <button onclick="toggleFilmingMode()" id="filmingBtn" class="flex items-center justify-center space-x-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow">
-            <i class="material-icons text-[14px]">videocam</i>
+            <i class="fa-solid fa-video text-[13px]"></i>
             <span>進入拍攝模式</span>
           </button>
           <button onclick="scrollToObsessPost()" class="flex items-center justify-center space-x-1.5 py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 font-bold rounded-lg transition-colors">
-            <i class="material-icons text-[14px]">center_focus_strong</i>
+            <i class="fa-solid fa-crosshairs text-[13px]"></i>
             <span>聚焦主演貼文</span>
           </button>
         </div>
@@ -166,7 +167,7 @@
           </div>
           <label class="flex flex-col items-center justify-center w-full h-16 border border-dashed border-neutral-700 rounded-xl cursor-pointer hover:bg-neutral-900/50 transition-colors">
             <div class="flex flex-col items-center justify-center pt-1 text-center">
-              <i class="material-icons text-neutral-400 text-[20px]">video_library</i>
+              <i class="fa-solid fa-film text-neutral-400 text-[18px]"></i>
               <p class="text-[10px] text-neutral-400 mt-1">選擇本機 MP4 / 影片檔案</p>
             </div>
             <input type="file" id="chromaVideoInput" accept="video/*" onchange="handleChromaVideo(this)" class="hidden">
@@ -230,11 +231,11 @@
           
           <div class="flex space-x-1">
             <button onclick="toggleAutoComments()" id="playPauseCommentBtn" class="flex-1 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded flex items-center justify-center space-x-1">
-              <i class="material-icons text-[14px]">pause</i>
+              <i class="fa-solid fa-pause text-[13px]"></i>
               <span id="playPauseText">暫停生成</span>
             </button>
             <button onclick="triggerSingleComment()" class="py-1.5 px-3 bg-red-950/80 hover:bg-red-900 border border-red-700 text-red-200 rounded flex items-center justify-center" title="立刻生一個酸民">
-              <i class="material-icons text-[14px]">add_alert</i>
+              <i class="fa-solid fa-triangle-exclamation text-[13px]"></i>
             </button>
             <button onclick="triggerHateBomb()" class="py-1.5 px-2 bg-yellow-950 hover:bg-yellow-900 border border-yellow-700 text-yellow-200 rounded text-[10px] flex items-center justify-center font-bold" title="連續灌爆留言">
               💣 留言灌爆
@@ -272,13 +273,13 @@
 
   <!-- 浮動開啟控制台小按鈕 (在完全隱藏控制台時可以召喚出來) -->
   <button id="floatingControlBtn" onclick="toggleControlPanel()" class="fixed bottom-6 left-6 w-10 h-10 rounded-full bg-neutral-900/90 border border-neutral-700 flex items-center justify-center text-white shadow-lg hover:bg-neutral-800 z-50 transition-all transform hover:scale-105 hidden">
-    <i class="material-icons">tune</i>
+    <i class="fa-solid fa-sliders"></i>
   </button>
 
   <!-- 螢幕中央「拍攝模式」提示 Overlay -->
   <div id="filmingOverlay" class="fixed inset-0 bg-black/80 z-[100] flex flex-col items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300">
     <div class="text-center">
-      <i class="material-icons text-[72px] text-red-600 animate-pulse">videocam</i>
+      <i class="fa-solid fa-video text-[72px] text-red-600 animate-pulse"></i>
       <h2 class="text-2xl font-black mt-2 tracking-widest text-white">MV 拍攝模式已啟動</h2>
       <p class="text-sm text-neutral-400 mt-1">控制台已完全隱藏。按下 <kbd class="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200">F</kbd> 或 <kbd class="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 rounded text-neutral-200">ESC</kbd> 退出</p>
     </div>
@@ -544,7 +545,7 @@
         : '';
 
       const verifiedMarkup = post.verified 
-        ? `<span class="material-icons text-[14px] text-sky-500 ml-1 select-none" style="font-size:14px; vertical-align:middle;">verified</span>`
+        ? `<i class="fa-solid fa-circle-check text-[14px] text-sky-500 ml-1 select-none" style="vertical-align:middle;"></i>`
         : '';
 
       postDiv.innerHTML = `
@@ -564,17 +565,17 @@
             </div>
             <div class="flex items-center space-x-2 text-threadsLightGray text-xs">
               <span>${post.time}</span>
-              <button class="hover:text-threadsText"><i class="material-icons text-[16px]">more_horiz</i></button>
+              <button class="hover:text-threadsText"><i class="fa-solid fa-ellipsis text-[16px]"></i></button>
             </div>
           </div>
           <p class="mt-1 text-threadsText/90 leading-relaxed whitespace-pre-line">${post.content}</p>
           ${imageMarkup}
           <!-- 互動按鈕 -->
           <div class="flex items-center space-x-5 text-threadsLightGray mt-3.5">
-            <button class="hover:text-red-500 transition-colors flex items-center"><i class="material-icons text-[20px]">favorite_border</i></button>
-            <button class="hover:text-threadsText transition-colors flex items-center"><i class="material-icons text-[20px]">chat_bubble_outline</i></button>
-            <button class="hover:text-green-500 transition-colors flex items-center"><i class="material-icons text-[20px]">autorenew</i></button>
-            <button class="hover:text-threadsText transition-colors flex items-center"><i class="material-icons text-[20px]">send</i></button>
+            <button class="hover:text-red-500 transition-colors flex items-center"><i class="fa-regular fa-heart text-[18px]"></i></button>
+            <button class="hover:text-threadsText transition-colors flex items-center"><i class="fa-regular fa-comment text-[18px]"></i></button>
+            <button class="hover:text-green-500 transition-colors flex items-center"><i class="fa-solid fa-retweet text-[18px]"></i></button>
+            <button class="hover:text-threadsText transition-colors flex items-center"><i class="fa-regular fa-paper-plane text-[18px]"></i></button>
           </div>
           <!-- 數據指標 -->
           <div class="flex items-center space-x-1 text-threadsLightGray text-xs mt-3">
@@ -617,11 +618,11 @@
               <div class="flex items-center">
                 <span class="font-black text-threadsText text-base tracking-wide hover:underline cursor-pointer">obsess</span>
                 <!-- 官方藍色勾勾驗證標誌 -->
-                <span class="material-icons text-[15px] text-sky-500 ml-1 select-none" style="font-size:15px; vertical-align:middle;">verified</span>
+                <i class="fa-solid fa-circle-check text-[15px] text-sky-500 ml-1 select-none" style="vertical-align:middle;"></i>
               </div>
               <div class="flex items-center space-x-2 text-threadsLightGray text-xs">
                 <span>5分鐘</span>
-                <button class="hover:text-threadsText"><i class="material-icons text-[18px]">more_horiz</i></button>
+                <button class="hover:text-threadsText"><i class="fa-solid fa-ellipsis text-[16px]"></i></button>
               </div>
             </div>
 
@@ -680,16 +681,16 @@
             <!-- 互動按鈕 -->
             <div class="flex items-center space-x-5 text-threadsLightGray mt-4">
               <button onclick="simulateLike()" class="hover:text-red-500 transition-all flex items-center transform active:scale-125">
-                <i class="material-icons text-[22px]" id="obsessLikeIcon">favorite_border</i>
+                <i id="obsessLikeIcon" class="fa-regular fa-heart text-[20px]"></i>
               </button>
               <button onclick="scrollToHaters()" class="hover:text-threadsText transition-all flex items-center">
-                <i class="material-icons text-[22px]">chat_bubble_outline</i>
+                <i class="fa-regular fa-comment text-[20px]"></i>
               </button>
               <button onclick="simulateRepost()" class="hover:text-green-500 transition-all flex items-center">
-                <i class="material-icons text-[22px]">autorenew</i>
+                <i class="fa-solid fa-retweet text-[20px]"></i>
               </button>
               <button class="hover:text-threadsText transition-colors flex items-center">
-                <i class="material-icons text-[22px]">send</i>
+                <i class="fa-regular fa-paper-plane text-[20px]"></i>
               </button>
             </div>
 
@@ -945,11 +946,11 @@
       const icon = document.getElementById('minIcon');
       if (isMinimized) {
         content.classList.remove('hidden');
-        icon.textContent = 'remove';
+        icon.className = "fa-solid fa-minus text-[14px]";
         isMinimized = false;
       } else {
         content.classList.add('hidden');
-        icon.textContent = 'add';
+        icon.className = "fa-solid fa-plus text-[14px]";
         isMinimized = true;
       }
     }
@@ -994,7 +995,7 @@
       }
     }
 
-    // 4. 調整綠幕縱橫比
+    // 4. 調整 green-glow 貼文比例
     function setChromaAspect(aspectClass) {
       currentChromaAspect = aspectClass;
       const box = document.getElementById('chromaKeyBox');
@@ -1020,13 +1021,13 @@
 
       if (autoCommentsEnabled) {
         btnText.textContent = "暫停生成";
-        btnIcon.textContent = "pause";
+        btnIcon.className = "fa-solid fa-pause text-[13px]";
         statusLabel.textContent = "動態跳動中";
         statusLabel.className = "px-1.5 py-0.5 bg-green-950 text-green-400 rounded-full text-[10px] font-bold";
         startAutoComments();
       } else {
         btnText.textContent = "啟動生成";
-        btnIcon.textContent = "play_arrow";
+        btnIcon.className = "fa-solid fa-play text-[13px]";
         statusLabel.textContent = "已暫停";
         statusLabel.className = "px-1.5 py-0.5 bg-neutral-800 text-neutral-400 rounded-full text-[10px] font-bold";
         if (commentsTimer) clearInterval(commentsTimer);
@@ -1052,13 +1053,11 @@
     // 8. 模擬按讚 (在手機畫面操作時可用)
     function simulateLike() {
       const icon = document.getElementById('obsessLikeIcon');
-      if (icon.textContent === 'favorite_border') {
-        icon.textContent = 'favorite';
-        icon.classList.add('text-red-500');
+      if (icon.classList.contains('fa-regular')) {
+        icon.className = 'fa-solid fa-heart text-[20px] text-red-500';
         dynamicLikes++;
       } else {
-        icon.textContent = 'favorite_border';
-        icon.classList.remove('text-red-500');
+        icon.className = 'fa-regular fa-heart text-[20px] text-threadsLightGray';
         dynamicLikes--;
       }
       updateCounters();

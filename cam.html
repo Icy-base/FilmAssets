@@ -979,7 +979,7 @@
         function processFrame(timestamp) {
             if (video.paused || video.ended || video.readyState < 2) return;
 
-            // 1. 每 60 FPS 重繪一次離線高速分析 Canvas 緩衝區 (供四元樹與顏色分析實時擷取)
+            // 1. 每 60 FPS 重繪一次離線高速分析 Canvas 緩衝區 (供四元樹與顏色 analysis 實時擷取)
             const cw = 480;
             const ch = 270;
             offlineCanvas.width = cw;
@@ -1321,7 +1321,7 @@
         }
 
         function drawQuadtreeNode(pixelData, x, y, w, h, sx, sy, sw, sh, depth) {
-            const stats = getCellStats(pixelData, sx, sy, sw, sh);
+            const stats = getCellStats(pixelData, sx, sy, sw, h);
 
             // 分裂條件
             if (depth < options.qtMaxDepth && stats.variance > options.qtThreshold && sw >= 4 && sh >= 4) {
@@ -1775,11 +1775,18 @@
             try {
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                     stopWebcam();
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                    // 新增 facingMode: { ideal: "environment" } 優先呼叫手機後置鏡頭並兼容電腦鏡頭
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 1280, 
+                            height: 720,
+                            facingMode: { ideal: "environment" }
+                        } 
+                    });
                     video.srcObject = stream;
                     startSystemTracking();
                     video.play();
-                    addLog("已切換至現場攝影機畫面！", "success");
+                    addLog("已成功呼叫後置鏡頭（現場攝影機）！", "success");
                 } else {
                     addLog("此環境不支援網路攝影機鏡頭。", "error");
                 }
@@ -1818,10 +1825,17 @@
             try {
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                     stopWebcam();
-                    stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                    // 新增 facingMode: { ideal: "environment" } 優先呼叫手機後置鏡頭並兼容電腦鏡頭
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: 1280, 
+                            height: 720,
+                            facingMode: { ideal: "environment" }
+                        } 
+                    });
                     video.srcObject = stream;
                     video.play();
-                    addLog("已切換至現場攝影機畫面！", "success");
+                    addLog("已成功呼叫後置鏡頭（現場攝影機）！", "success");
                 }
             } catch (err) {
                 addLog(`攝影機載入失敗: ${err.message}`, "error");

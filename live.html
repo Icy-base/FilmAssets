@@ -151,32 +151,34 @@
 
                 <!-- 底部：留言區與互動功能 (極致精簡靠左配置) -->
                 <div class="w-full flex flex-col space-y-2.5 pb-1">
-                    <!-- 底部：留言區與互動功能 (極致精簡靠左配置) -->
-                    <div class="w-full flex flex-col space-y-2.5 pb-1">
-                        <!-- 酸民留言板 (縮小尺寸、靠左，羽化漸變消失) -->
-                        <div class="w-[85%] max-w-[280px] max-h-[32vh] overflow-y-auto no-scrollbar flex flex-col space-y-1.5" id="commentsWrapper">
-                            <div class="flex flex-col space-y-1.5 pb-2" id="commentsContainer">
-                                <!-- 留言動態插入 -->
-                            </div>
-                        </div>
-
-                        <!-- 底部虛擬輸入框 (緊湊化) -->
-                        <div class="flex items-center justify-between w-full bg-black bg-opacity-35 backdrop-blur-md rounded-full px-3.5 py-1.5 border border-white border-opacity-10">
-                            <div class="flex items-center space-x-2 text-gray-300 text-[11px]">
-                                <span class="material-icons text-sm text-gray-400">chat_bubble_outline</span>
-                                <span>與 </span><span class="font-bold text-white">obsess</span><span> 互動...</span>
-                            </div>
-                            <div class="flex items-center space-x-2.5 text-gray-300">
-                                <span class="material-icons text-base hover:text-white transition">sentiment_very_dissatisfied</span>
-                                <!-- 將倒讚圖示啟用滑鼠與觸控事件，隱形連結至控制台開關 -->
-                                <span id="dislikeToggleBtn" class="material-icons text-base text-red-500 animate-bounce pointer-events-auto cursor-pointer" title="隱藏/顯示導演主控台">thumb_down</span>
-                            </div>
+                    <!-- 酸民留言板 (縮小尺寸、靠左，羽化漸變消失) -->
+                    <div class="w-[85%] max-w-[280px] max-h-[32vh] overflow-y-auto no-scrollbar flex flex-col space-y-1.5" id="commentsWrapper">
+                        <div class="flex flex-col space-y-1.5 pb-2" id="commentsContainer">
+                            <!-- 留言動態插入 -->
                         </div>
                     </div>
 
+                    <!-- 底部真實輸入框 (具備 pointer-events-auto 使其可供輸入，無痕擬真外觀) -->
+                    <div class="flex items-center justify-between w-full bg-black bg-opacity-35 backdrop-blur-md rounded-full px-3.5 py-1.5 border border-white border-opacity-10 pointer-events-auto">
+                        <div class="flex items-center space-x-2 text-gray-300 text-[11px] flex-1">
+                            <span class="material-icons text-sm text-gray-400 shrink-0">chat_bubble_outline</span>
+                            <!-- 實體輸入欄位，按 Enter 即可發送個人留言 -->
+                            <input type="text" id="liveChatInput" placeholder="與 obsess 互動..." class="bg-transparent text-white placeholder-gray-400 focus:outline-none w-full text-[11px] border-none p-0 focus:ring-0" autocomplete="off">
+                        </div>
+                        <div class="flex items-center space-x-2.5 text-gray-300 shrink-0">
+                            <span class="material-icons text-base hover:text-white transition cursor-pointer">sentiment_very_dissatisfied</span>
+                            <!-- 將倒讚圖示啟用滑鼠與觸控事件，隱形連結至控制台開關 -->
+                            <span id="dislikeToggleBtn" class="material-icons text-base text-red-500 animate-bounce cursor-pointer" title="隱藏/顯示導演主控台">thumb_down</span>
+                        </div>
+                    </div>
                 </div>
 
             </div>
+
+            <!-- 控制浮鈕（當隱藏控制台時，仍可在畫面上微調，可視情況啟用） -->
+            <button id="floatingShowPanelBtn" class="absolute top-4 left-4 z-40 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg opacity-0 hover:opacity-100 transition duration-300 pointer-events-auto" title="顯示導演主控台">
+                <span class="material-icons">settings</span>
+            </button>
         </div>
     </div>
 
@@ -427,8 +429,12 @@
         const commentsWrapper = document.getElementById('commentsWrapper');
         const reactionsContainer = document.getElementById('reactionsContainer');
         const directorPanel = document.getElementById('directorPanel');
-        const dislikeToggleBtn = document.getElementById('dislikeToggleBtn');
+        const floatingShowPanelBtn = document.getElementById('floatingShowPanelBtn');
         const hidePanelBtn = document.getElementById('hidePanelBtn');
+        const dislikeToggleBtn = document.getElementById('dislikeToggleBtn');
+
+        // 輸入欄位
+        const liveChatInput = document.getElementById('liveChatInput');
 
         // 控制台欄位
         const inputAccountName = document.getElementById('inputAccountName');
@@ -502,7 +508,7 @@
 
         function handleVideoFile(file) {
             if (!file.type.startsWith('video/')) {
-                alert('請上傳有效的影片檔案！');
+                videoMeta.innerHTML = `<span class="text-red-500 font-bold text-xs">格式錯誤！限 MP4/WebM</span>`;
                 return;
             }
             const fileURL = URL.createObjectURL(file);
@@ -514,7 +520,7 @@
                 updatePlayState(false);
             });
             dropZone.classList.add('hidden');
-            videoMeta.innerHTML = `<span class="truncate max-w-[200px] inline-block">${file.name}</span>`;
+            videoMeta.innerHTML = `<span class="truncate max-w-[200px] inline-block text-emerald-400 font-semibold">${file.name}</span>`;
         }
 
         // 影片載入時間長度更新
@@ -619,11 +625,11 @@
 
         commentSpeedRange.addEventListener('input', restartCommentEngine);
 
-        function spawnComment(customText = null, isCustomHighlight = false) {
-            const username = haterUsernames[Math.floor(Math.random() * haterUsernames.length)];
+        function spawnComment(customText = null, isCustomHighlight = false, customUsername = null) {
+            const username = customUsername || haterUsernames[Math.floor(Math.random() * haterUsernames.length)];
             const text = customText || haterComments[Math.floor(Math.random() * haterComments.length)];
             
-            // 【全新優化】使用 Lorem Picsum 全球免費隨機圖庫 API (完美支援 CORS、絕不會造成導出影片頭像空白)
+            // 使用 Picsum 全球免費隨機圖庫 API (完美支援 CORS、絕不會造成導出影片頭像空白)
             const randomId = Math.floor(Math.random() * 800);
             const avatarUrl = `https://picsum.photos/80?random=${randomId}`;
 
@@ -672,6 +678,18 @@
                 commentsContainer.removeChild(commentsContainer.firstChild);
             }
         }
+
+        // 串接底部真實輸入框發送事件
+        liveChatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const text = liveChatInput.value.trim();
+                if (text) {
+                    spawnComment(text, false, "我 (觀眾)");
+                    liveChatInput.value = '';
+                    liveChatInput.blur(); // 送出後自動取消聚焦，便於收回手機虛擬鍵盤
+                }
+            }
+        });
 
         // --- 7. 即時導演言論干預送出 ---
         btnSendCustomComment.addEventListener('click', () => {
@@ -774,7 +792,7 @@
 
         // 一鍵隱藏/顯示控制面板
         function toggleDirectorPanel() {
-            if (directorPanel.classList.contains('md:w-[420px]')) {
+            if (directorPanel.classList.contains('md:w-[420px]') && !directorPanel.classList.contains('w-0')) {
                 // 隱藏
                 directorPanel.classList.remove('md:w-[420px]', 'p-6');
                 directorPanel.classList.add('md:w-0', 'w-0', 'p-0', 'overflow-hidden', 'opacity-0', 'border-none');
@@ -1153,7 +1171,8 @@
                 mediaRecorder = new MediaRecorder(stream, options);
             } catch (e) {
                 console.error("無法初始化 MediaRecorder:", e);
-                alert("此瀏覽器不支援本錄影合成機制，建議使用 Chrome 開啟。");
+                recStatus.textContent = "錄製出錯：不支援的瀏覽器，建議使用 Chrome！";
+                recStatus.className = "text-center text-[11px] text-red-500 font-bold";
                 isRecording = false;
                 cancelAnimationFrame(canvasRenderLoopId);
                 return;
@@ -1206,6 +1225,12 @@
             restartCommentEngine();
             restartDislikeEngine();
             updateCommentSize(); // 載入時初始化文字大小變數
+
+            // 手機瀏覽時預設隱藏控制台 (螢幕寬度小於 768px 時)
+            if (window.innerWidth < 768) {
+                directorPanel.classList.remove('md:w-[420px]', 'p-6');
+                directorPanel.classList.add('w-0', 'p-0', 'overflow-hidden', 'opacity-0', 'border-none');
+            }
             
             // 預載初始留言
             for (let i = 0; i < 4; i++) {

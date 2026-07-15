@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拼貼風格標題文字產生器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入多種風格的中英文字體 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;500;900&family=Noto+Serif+TC:wght@300;700;900&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=Long+Cang&family=Klee+One:wght@400;600&family=Courier+Prime:wght@400;700&family=Montserrat:wght@400;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <!-- 預先在 head 靜態載入 gifshot，沙盒環境下靜態加載的成功率遠高於動態插入 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js"></script>
+    <style>
+        /* 隱藏的預載區域，確保 Canvas 繪製前字體已被瀏覽器解析 */
+        #font-preload { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden; }
+        
+        /* 透明棋盤格背景，用於預覽區 */
+        .checker-bg {
+            background-color: #121212;
+            background-image: 
+                linear-gradient(45deg, #1e1e1e 25%, transparent 25%, transparent 75%, #1e1e1e 75%, #1e1e1e),
+                linear-gradient(45deg, #1e1e1e 25%, transparent 25%, transparent 75%, #1e1e1e 75%, #1e1e1e);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+
+        /* 自訂滾動條 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555555; }
+    </style>
+</head>
+<body class="bg-neutral-950 text-neutral-100 h-screen flex flex-col md:flex-row overflow-hidden font-sans">
+
+    <!-- 用於強制載入字體 -->
+    <div id="font-preload"></div>
+
+    <!-- 左側黑白極簡控制台 -->
+    <div class="w-full md:w-80 p-6 bg-black border-r border-neutral-800 flex flex-col gap-5 shadow-2xl z-10 overflow-y-auto shrink-0 font-mono">
+        <div>
+            <h1 class="text-xl font-black tracking-widest text-white flex items-center gap-2 uppercase">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
+                Ransom Title
+            </h1>
+            <p class="text-[10px] text-neutral-500 mt-1 uppercase tracking-wider">拼貼風格標題文字產生器</p>
+        </div>
+
+        <!-- 拼貼模式 -->
+        <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-neutral-400 uppercase tracking-wider">拼貼模式</label>
+            <div class="flex bg-neutral-900 p-1 rounded border border-neutral-800">
+                <button id="modeDecomp" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm">部件重組 (新)</button>
+                <button id="modeMask" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all">幾何遮罩 (舊)</button>
+            </div>
+            <p id="modeDesc" class="text-[10px] text-neutral-500 leading-relaxed">將文字拆解為精細部件，進行非等比例拉伸。遇到英文或複雜字元時將保持獨立或安全降級，確保高辨識度與美感。</p>
+        </div>
+
+        <!-- 文字輸入 -->
+        <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-neutral-400 uppercase tracking-wider">輸入文字</label>
+            <textarea id="textInput" class="w-full bg-neutral-900 border border-neutral-800 p-3 rounded text-sm focus:ring-1 focus:ring-white focus:border-white focus:outline-none resize-none transition-colors font-medium text-white placeholder-neutral-700" rows="3" placeholder="輸入文字 (支援中英文)...">WANTED 跪下</textarea>
+        </div>
+
+        <!-- 參數調節區 -->
+        <div class="border-t border-neutral-800 pt-4 flex flex-col gap-4">
+            <h3 class="text-[10px] font-black text-neutral-500 uppercase tracking-widest">風格與解析度設定</h3>
+            
+            <!-- 匯出解析度倍率 -->
+            <div class="flex flex-col gap-1.5">
+                <label class="text-xs text-neutral-300 font-bold">匯出影片解析度 (MV 專用)</label>
+                <select id="exportScaleInput" class="w-full bg-neutral-900 border border-neutral-800 p-2 rounded text-xs text-white focus:ring-1 focus:ring-white focus:outline-none cursor-pointer">
+                    <option value="1">網頁預覽標準畫質 (1x)</option>
+                    <option value="1.5">HD 畫質 (1.5x)</option>
+                    <option value="2">FHD 1080p 專業級 (2x)</option>
+                    <option value="3">2.5K 影視特效級 (3x)</option>
+                    <option value="4" selected>4K Ultra HD 頂級大師 (4x)</option>
+                </select>
+                <p class="text-[10px] text-neutral-500 leading-relaxed">預覽時一律採用 1x 確保流暢，僅在「點擊匯出」時以高解析度無損渲染。GIF 格式最大支援 1080p (2x)。</p>
+            </div>
+
+            <!-- 報紙模式開關 -->
+            <div class="flex items-center justify-between border-b border-neutral-900 pb-3">
+                <label class="text-xs text-neutral-300 font-bold">報紙黑白網點模式</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="newspaperModeToggle" class="sr-only peer">
+                    <div class="w-11 h-6 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:bg-black after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-neutral-400 after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white"></div>
+                </label>
+            </div>
+
+            <!-- 文字字距 (Tracking) -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">文字字距 (Tracking)</label>
+                    <span id="trackingValue" class="text-xs text-neutral-100 font-mono">-10px</span>
+                </div>
+                <input type="range" id="trackingInput" min="-60" max="60" value="-10" class="w-full accent-white">
+            </div>
+
+            <!-- 部件內部間距 (Part Spacing) -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">部件內部間距 (Part Spacing)</label>
+                    <span id="partGapValue" class="text-xs text-neutral-100 font-mono">5%</span>
+                </div>
+                <input type="range" id="partGapInput" min="-15" max="30" value="5" class="w-full accent-white">
+            </div>
+
+            <!-- 零件背景出現機率 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">零件背景機率 (Bg Chance)</label>
+                    <span id="bgChanceValue" class="text-xs text-neutral-100 font-mono">60%</span>
+                </div>
+                <input type="range" id="bgChanceInput" min="0" max="100" value="60" class="w-full accent-white">
+            </div>
+
+            <!-- 整體字元排版高低錯位 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">整體文字高低錯位 (Offset)</label>
+                    <span id="charOffsetValue" class="text-xs text-neutral-100 font-mono">12px</span>
+                </div>
+                <input type="range" id="charOffsetInput" min="0" max="40" value="12" class="w-full accent-white">
+            </div>
+
+            <!-- 部件旋轉錯位程度 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">部件內部歪斜微調</label>
+                    <span id="chaosValue" class="text-xs text-neutral-100 font-mono">15%</span>
+                </div>
+                <input type="range" id="chaosInput" min="0" max="40" value="15" class="w-full accent-white">
+            </div>
+
+            <!-- 背景邊距大小 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">背景剪報尺寸 (邊距)</label>
+                    <span id="bgPaddingValue" class="text-xs text-neutral-100 font-mono">1.15x</span>
+                </div>
+                <input type="range" id="bgPaddingInput" min="100" max="135" value="115" class="w-full accent-white">
+            </div>
+
+            <!-- FPS 變換頻率 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">變換頻率 (FPS)</label>
+                    <span id="fpsValue" class="text-xs text-neutral-100 font-mono">8</span>
+                </div>
+                <input type="range" id="fpsInput" min="4" max="15" value="8" class="w-full accent-white">
+            </div>
+
+            <!-- 影片長度 -->
+            <div class="flex flex-col gap-1">
+                <div class="flex justify-between">
+                    <label class="text-xs text-neutral-300">影片長度 (秒)</label>
+                    <span id="durationValue" class="text-xs text-neutral-100 font-mono">3</span>
+                </div>
+                <input type="range" id="durationInput" min="1" max="10" value="3" class="w-full accent-white">
+            </div>
+        </div>
+
+        <!-- 狀態與進度區 -->
+        <div id="statusArea" class="hidden flex-col gap-2">
+            <div class="flex justify-between text-[11px] font-bold text-neutral-400">
+                <span id="statusText">處理中...</span>
+                <span id="progressText">0%</span>
+            </div>
+            <div class="w-full bg-neutral-900 h-1.5 rounded overflow-hidden border border-neutral-800">
+                <div id="progressBar" class="bg-white h-full w-0 transition-all duration-200"></div>
+            </div>
+        </div>
+
+        <div class="mt-auto flex flex-col gap-3 pt-4 border-t border-neutral-800">
+            <button id="generateBtn" disabled class="w-full bg-neutral-900 text-neutral-500 py-3 rounded font-bold transition-all flex items-center justify-center gap-2 cursor-not-allowed">
+                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" id="loadingIcon">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                載入素材與字體中...
+            </button>
+            
+            <!-- 雙排黑白簡約匯出按鈕區 -->
+            <div id="exportActionGroup" class="hidden flex-col gap-2">
+                <button id="exportBtn" class="w-full bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                    匯出透明 WebM 影片
+                </button>
+                <button id="exportGifBtn" class="w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    匯出透明 GIF 動圖 (AE專用)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右側預覽區 -->
+    <div class="flex-1 relative flex flex-col items-center justify-center checker-bg p-4 md:p-8">
+        <div class="absolute top-4 right-4 bg-black/80 px-3 py-1.5 rounded text-[11px] text-neutral-400 border border-neutral-800 backdrop-blur-sm pointer-events-none uppercase tracking-wider">
+            Live Preview (Alpha Canvas)
+        </div>
+        <!-- 使用一個容器來限制 canvas 最大尺寸並保持比例 -->
+        <div class="max-w-full max-h-full flex items-center justify-center overflow-hidden rounded shadow-2xl ring-1 ring-white/5 bg-transparent">
+            <canvas id="previewCanvas" class="max-w-full max-h-[80vh] object-contain"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // --- 設定與狀態 ---
+        const fonts = [
+            { family: 'Noto Sans TC', weights: [300, 500, 900] },
+            { family: 'Noto Serif TC', weights: [300, 700, 900] },
+            { family: 'Zhi Mang Xing', weights: [400] },
+            { family: 'Ma Shan Zheng', weights: [400] },
+            { family: 'Liu Jian Mao Cao', weights: [400] },
+            { family: 'Long Cang', weights: [400] },
+            { family: 'Klee One', weights: [400, 600] },
+            { family: 'Courier Prime', weights: [400, 700] },
+            { family: 'Montserrat', weights: [400, 900] },
+            { family: 'Playfair Display', weights: [700] }
+        ];
+
+        // 漢字偏旁與部首本地精確對照表，確保拆解準確
+        const localDecomp = {
+            '跪': '⿰⿱口止危',
+            '下': '⿱一卜',
+            '求': '⿻氺丶',
+            '饒': '⿰飠堯',
+            '你': '⿰亻尔',
+            '我': '⿻𠂉找',
+            '他': '⿰亻也',
+            '們': '⿰亻門',
+            '好': '⿰女子',
+            '給': '⿰糹合',
+            '錢': '⿰金戔',
+            '死': '⿱歹匕',
+            '勒': '⿰革力',
+            '索': '⿱十冖糸',
+            '信': '⿰亻言',
+            '警': '⿱敬言',
+            '報': '⿰幸𠂤',
+            '告': '⿱⺧口',
+            '處': '⿸虍処',
+            '理': '⿰王里',
+            '辦': '⿲辛力辛',
+            '法': '⿰氵去',
+            '家': '⿱宀豕',
+            '世': '⿻廿凵', // 偵測到疊加符號將自動進行安全降級
+            '人': '人',
+            '口': '口',
+            '手': '手',
+            '天': '⿱一大',
+            '地': '⿰土也',
+            '風': '⿵几𠂡',
+            '格': '木',
+            '標': '木',
+            '題': '⿰是頁',
+            '產': '文',
+            '器': '⿱吅⿰⿱十口吅'
+        };
+
+        // 替換特殊部首字元，使其在標準 Google 字體中可漂亮渲染出來
+        const glyphOverrides = {
+            '𧾷': '足',
+            '飠': '食',
+            '糹': '糸',
+            '亻': '人',
+            '彳': '行',
+            '氵': '水',
+            '灬': '火',
+            '犭': '犬',
+            '⻏': '邑',
+            '⻖': '阜',
+            '宀': '宀',
+            '辶': '辵',
+            '𦾏': '若',
+            '𡗗': '春'
+        };
+
+        let loadedBgImages = [];
+        let precomputedFrames = []; // 儲存預覽用 ImageData (始終保持在 1x 輕量解析度)
+        let previewInterval = null;
+        let isGenerating = false;
+        let currentMode = 'decomp'; // 'decomp' (部件重組) 或 'mask' (幾何遮罩)
+        let decompData = null; // 儲存漢字拆解資料
+
+        // --- DOM 元素 ---
+        const ui = {
+            modeDecomp: document.getElementById('modeDecomp'),
+            modeMask: document.getElementById('modeMask'),
+            modeDesc: document.getElementById('modeDesc'),
+            textInput: document.getElementById('textInput'),
+            fpsInput: document.getElementById('fpsInput'),
+            fpsValue: document.getElementById('fpsValue'),
+            durationInput: document.getElementById('durationInput'),
+            durationValue: document.getElementById('durationValue'),
+            chaosInput: document.getElementById('chaosInput'),
+            chaosValue: document.getElementById('chaosValue'),
+            bgPaddingInput: document.getElementById('bgPaddingInput'),
+            bgPaddingValue: document.getElementById('bgPaddingValue'),
+            charOffsetInput: document.getElementById('charOffsetInput'),
+            charOffsetValue: document.getElementById('charOffsetValue'),
+            trackingInput: document.getElementById('trackingInput'),
+            trackingValue: document.getElementById('trackingValue'),
+            partGapInput: document.getElementById('partGapInput'),
+            partGapValue: document.getElementById('partGapValue'),
+            bgChanceInput: document.getElementById('bgChanceInput'),
+            bgChanceValue: document.getElementById('bgChanceValue'),
+            newspaperModeToggle: document.getElementById('newspaperModeToggle'),
+            exportScaleInput: document.getElementById('exportScaleInput'),
+            generateBtn: document.getElementById('generateBtn'),
+            exportActionGroup: document.getElementById('exportActionGroup'),
+            exportBtn: document.getElementById('exportBtn'),
+            exportGifBtn: document.getElementById('exportGifBtn'),
+            statusArea: document.getElementById('statusArea'),
+            progressBar: document.getElementById('progressBar'),
+            progressText: document.getElementById('progressText'),
+            statusText: document.getElementById('statusText'),
+            previewCanvas: document.getElementById('previewCanvas'),
+            loadingIcon: document.getElementById('loadingIcon')
+        };
+
+        // --- UI 事件綁定 ---
+        ui.fpsInput.addEventListener('input', e => ui.fpsValue.innerText = e.target.value);
+        ui.durationInput.addEventListener('input', e => ui.durationValue.innerText = e.target.value);
+        ui.chaosInput.addEventListener('input', e => ui.chaosValue.innerText = e.target.value + '%');
+        ui.bgPaddingInput.addEventListener('input', e => ui.bgPaddingValue.innerText = (e.target.value / 100).toFixed(2) + 'x');
+        ui.charOffsetInput.addEventListener('input', e => ui.charOffsetValue.innerText = e.target.value + 'px');
+        ui.trackingInput.addEventListener('input', e => ui.trackingValue.innerText = e.target.value + 'px');
+        ui.partGapInput.addEventListener('input', e => ui.partGapValue.innerText = e.target.value + '%');
+        ui.bgChanceInput.addEventListener('input', e => ui.bgChanceValue.innerText = e.target.value + '%');
+        
+        ui.generateBtn.addEventListener('click', generateAnimation);
+        ui.exportBtn.addEventListener('click', exportVideo);
+        ui.exportGifBtn.addEventListener('click', exportGIF);
+
+        ui.modeDecomp.addEventListener('click', () => setMode('decomp'));
+        ui.modeMask.addEventListener('click', () => setMode('mask'));
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'decomp') {
+                ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
+                ui.modeMask.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
+                ui.modeDesc.innerText = '將文字拆解為精細部件，進行非等比例拉伸。遇到英文或複雜字元時將保持獨立或安全降級，確保高辨識度與美感。';
+            } else {
+                ui.modeMask.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
+                ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
+                ui.modeDesc.innerText = '將文字用隨機多邊形切割成碎片，視覺上模擬手工剪紙效果。';
+            }
+            if (!ui.generateBtn.disabled && !isGenerating) {
+                generateAnimation();
+            }
+        }
+
+        // --- 智慧型多重 CDN GIF 載入器 (解決 sandbox 與網路失效問題) ---
+        async function loadGifshot() {
+            if (typeof gifshot !== 'undefined') return true;
+            
+            const cdns = [
+                'https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js',
+                'https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js',
+                'https://unpkg.com/gifshot@0.4.5/build/gifshot.min.js'
+            ];
+            
+            for (const url of cdns) {
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = url;
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                    if (typeof gifshot !== 'undefined') return true;
+                } catch (e) {
+                    console.warn(`Failed to load gifshot from ${url}, trying next...`);
+                }
+            }
+            return false;
+        }
+
+        // --- 初始化 (下載資源與部首偏旁) ---
+        async function init() {
+            const preloadDiv = document.getElementById('font-preload');
+            fonts.forEach(f => {
+                f.weights.forEach(w => {
+                    const span = document.createElement('span');
+                    span.style.fontFamily = `'${f.family}'`;
+                    span.style.fontWeight = w;
+                    span.innerText = '載';
+                    preloadDiv.appendChild(span);
+                });
+            });
+
+            const fontLoadPromise = document.fonts.ready.catch(e => console.warn("Font loading wait failed, continuing anyway."));
+
+            // 載入 Picsum 圖片 (模擬豐富色彩的雜誌、海報與報章材料)
+            const bgPromises = [];
+            for (let i = 0; i < 12; i++) {
+                bgPromises.push(new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = 'Anonymous';
+                    img.onload = () => resolve(img);
+                    img.onerror = () => resolve(null);
+                    img.src = `https://picsum.photos/${450 + i * 15}/${450 + i * 15}?random=${Math.random()}`;
+                }));
+            }
+
+            // 載入字典數據庫
+            const decompPromise = fetch('https://cdn.jsdelivr.net/gh/skishore/makemeahanzi@master/dictionary.txt')
+                .then(res => res.text())
+                .then(text => {
+                    const data = {};
+                    text.split('\n').forEach(line => {
+                        if(!line) return;
+                        try {
+                            const entry = JSON.parse(line);
+                            if (entry.character && entry.decomposition) {
+                                data[entry.character] = entry.decomposition;
+                            }
+                        } catch(e) {}
+                    });
+                    return data;
+                })
+                .catch(e => {
+                    console.error("Failed to load decomposition data, fallback to local database:", e);
+                    return {};
+                });
+
+            // 背景預載 GIF 引擎，確保使用者點擊時零延遲
+            loadGifshot().catch(() => {});
+
+            ui.statusArea.classList.remove('hidden');
+            ui.statusArea.classList.add('flex');
+            ui.statusText.innerText = '正在下載字體、各式報章雜誌圖片與字典偏旁資料...';
+            ui.progressBar.style.width = '40%';
+
+            const [_, bgResults, decompResults] = await Promise.all([fontLoadPromise, Promise.all(bgPromises), decompPromise]);
+            loadedBgImages = bgResults.filter(img => img !== null);
+            decompData = decompResults;
+
+            ui.progressBar.style.width = '100%';
+            await new Promise(r => setTimeout(r, 200));
+
+            ui.statusArea.classList.add('hidden');
+            ui.loadingIcon.classList.add('hidden');
+            ui.generateBtn.disabled = false;
+            ui.generateBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg hover:shadow-white/10 flex items-center justify-center gap-2";
+            ui.generateBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                產生預覽
+            `;
+            
+            generateAnimation();
+        }
+
+        // --- IDS 漢字結構語法解析器 ---
+        function parseIDS(str) {
+            if (!str) return null;
+            let index = 0;
+            const chars = Array.from(str);
+
+            function parseNode() {
+                if (index >= chars.length) return null;
+                const char = chars[index++];
+                if (char >= '\u2FF0' && char <= '\u2FFB') {
+                    const op = char;
+                    if (op === '⿲' || op === '⿳') {
+                        const c1 = parseNode();
+                        const c2 = parseNode();
+                        const c3 = parseNode();
+                        return { op, children: [c1, c2, c3] };
+                    } else {
+                        const c1 = parseNode();
+                        const c2 = parseNode();
+                        return { op, children: [c1, c2] };
+                    }
+                } else {
+                    return { op: 'leaf', char };
+                }
+            }
+
+            return parseNode();
+        }
+
+        function getASTForChar(char, depth = 0, maxDepth = 2) {
+            let decompStr = localDecomp[char];
+            if (!decompStr && decompData && decompData[char]) {
+                decompStr = decompData[char];
+            }
+
+            if (!decompStr || depth >= maxDepth) {
+                return { op: 'leaf', char };
+            }
+
+            const ast = parseIDS(decompStr);
+            if (!ast) return { op: 'leaf', char };
+
+            function resolveTree(node, currentDepth) {
+                if (!node) return null;
+                if (node.op === 'leaf') {
+                    if (currentDepth < maxDepth && (localDecomp[node.char] || (decompData && decompData[node.char]))) {
+                        return getASTForChar(node.char, currentDepth + 1, maxDepth);
+                    }
+                    return node;
+                }
+                if (node.children) {
+                    node.children = node.children.map(child => resolveTree(child, currentDepth + 1));
+                }
+                return node;
+            }
+
+            return resolveTree(ast, depth);
+        }
+
+        function needsMaskFallback(node) {
+            if (!node) return false;
+            
+            if (node.op === 'leaf') {
+                const code = node.char.charCodeAt(0);
+                const isStandardCJK = code >= 0x4E00 && code <= 0x9FFF;
+                const inOverride = glyphOverrides[node.char] !== undefined;
+                const isAlphanumeric = /^[a-zA-Z0-9]$/.test(node.char);
+                return (!isStandardCJK && !inOverride && !isAlphanumeric);
+            }
+
+            const supportedOps = ['⿰', '⿱', '⿲', '⿳'];
+            if (!supportedOps.includes(node.op)) {
+                return true;
+            }
+
+            if (node.children) {
+                for (let child of node.children) {
+                    if (needsMaskFallback(child)) return true;
+                }
+            }
+            return false;
+        }
+
+        // --- 遞迴計算部件的排版邊界與比例 (支援動態間距與 Scale) ---
+        function layoutAST(node, x, y, w, h, gapRatio, results = []) {
+            if (!node) return results;
+
+            if (node.op === 'leaf') {
+                results.push({
+                    char: glyphOverrides[node.char] || node.char,
+                    x, y, w, h
+                });
+                return results;
+            }
+
+            const children = node.children;
+            if (!children || children.length === 0) return results;
+
+            if (node.op === '⿰') {
+                const subW = w * (1 - gapRatio) / 2;
+                layoutAST(children[0], x - subW/2 - (w * gapRatio)/2, y, subW, h, gapRatio, results);
+                layoutAST(children[1], x + subW/2 + (w * gapRatio)/2, y, subW, h, gapRatio, results);
+            } 
+            else if (node.op === '⿱') {
+                const subH = h * (1 - gapRatio) / 2;
+                layoutAST(children[0], x, y - subH/2 - (h * gapRatio)/2, w, subH, gapRatio, results);
+                layoutAST(children[1], x, y + subH/2 + (h * gapRatio)/2, w, subH, gapRatio, results);
+            } 
+            else if (node.op === '⿲') {
+                const subW = w * (1 - gapRatio * 2) / 3;
+                layoutAST(children[0], x - subW - w * gapRatio, y, subW, h, gapRatio, results);
+                layoutAST(children[1], x, y, subW, h, gapRatio, results);
+                layoutAST(children[2], x + subW + w * gapRatio, y, subW, h, gapRatio, results);
+            } 
+            else if (node.op === '⿳') {
+                const subH = h * (1 - gapRatio * 2) / 3;
+                layoutAST(children[0], x, y - subH - h * gapRatio, w, subH, gapRatio, results);
+                layoutAST(children[1], x, y, w, subH, gapRatio, results);
+                layoutAST(children[2], x, y + subH + h * gapRatio, w, subH, gapRatio, results);
+            } 
+            else {
+                layoutAST(children[0], x, y, w, h, gapRatio, results);
+                if (children[1]) {
+                    layoutAST(children[1], x, y, w * 0.55, h * 0.55, gapRatio, results);
+                }
+            }
+
+            return results;
+        }
+
+        // --- 繪製隨機「手剪感」的偏旁背景卡 (支援黑白報紙半調網點濾鏡與 Scale 縮放) ---
+        function drawRansomCard(ctx, x, y, w, h, bgImg, paddingFactor, isNewspaperMode, scale) {
+            ctx.save();
+            ctx.translate(x, y); // 轉移至局部基準中心
+            
+            // 根據部件的長寬與邊距縮放背景
+            const cardW = w * paddingFactor;
+            const cardH = h * paddingFactor;
+            const hw = cardW / 2;
+            const hh = cardH / 2;
+
+            // 1. 3D 立體浮起陰影 (等比例縮放)
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            ctx.shadowBlur = 12 * scale;
+            ctx.shadowOffsetX = 3 * scale;
+            ctx.shadowOffsetY = 5 * scale;
+
+            // 2. 隨機不規則多邊形手剪裁切路徑
+            const edgeNoise = Math.min(cardW, cardH) * 0.12;
+            const corners = [
+                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise }, // 左上
+                { x: hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise },  // 右上
+                { x: hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise },   // 右下
+                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise }   // 左下
+            ];
+
+            ctx.beginPath();
+            ctx.moveTo(corners[0].x, corners[0].y);
+            for (let i = 0; i < 4; i++) {
+                const next = corners[(i + 1) % 4];
+                const curr = corners[i];
+                const cx = (curr.x + next.x) / 2 + (Math.random() - 0.5) * (cardW * 0.04);
+                const cy = (curr.y + next.y) / 2 + (Math.random() - 0.5) * (cardH * 0.04);
+                ctx.quadraticCurveTo(cx, cy, next.x, next.y);
+            }
+            ctx.closePath();
+
+            // 紙張側邊白邊基底 (報紙模式下紙張色調稍偏白灰色)
+            ctx.fillStyle = isNewspaperMode ? '#f0f0f0' : '#fbf9f5';
+            ctx.fill();
+
+            // 限制繪製範圍，裁切裡面的彩色局部圖片
+            ctx.clip();
+
+            // 3. 繪製高倍率「局部放大」雜誌彩頁細節
+            if (bgImg) {
+                ctx.save();
+                
+                // 報紙模式：套用黑白、高對比濾鏡
+                if (isNewspaperMode) {
+                    ctx.filter = 'grayscale(100%) contrast(160%) brightness(100%)';
+                }
+
+                // 只取原圖非常窄小的一部分 (約 8% ~ 16%) 進行極致拉伸
+                const cropPercent = 0.08 + Math.random() * 0.08;
+                const cropW = bgImg.width * cropPercent;
+                const cropH = bgImg.height * cropPercent;
+                
+                // 確保截取區域不溢出
+                const cropX = Math.random() * (bgImg.width - cropW);
+                const cropY = Math.random() * (bgImg.height - cropH);
+
+                // 全角度隨機旋轉，使字卡內花紋完全抽象化
+                ctx.rotate((Math.random() - 0.5) * Math.PI * 2);
+                ctx.scale(1.3, 1.3);
+                ctx.drawImage(bgImg, cropX, cropY, cropW, cropH, -hw, -hh, cardW, cardH);
+                ctx.restore();
+            } else {
+                const defaultColors = isNewspaperMode ? ['#555555', '#aaaaaa', '#333333', '#dddddd'] : ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557', '#f4a261'];
+                ctx.fillStyle = defaultColors[Math.floor(Math.random() * defaultColors.length)];
+                ctx.fillRect(-hw, -hh, cardW, cardH);
+            }
+
+            // 4. 米色報紙光澤塗層 (彩色時保留溫暖感，報紙模式下保留微弱紙黃)
+            ctx.fillStyle = isNewspaperMode ? 'rgba(255, 252, 245, 0.08)' : 'rgba(254, 251, 243, 0.15)';
+            ctx.fillRect(-hw, -hh, cardW, cardH);
+
+            // 5. 印刷網格與網點紋理 (在 4K 下會自適應放大)
+            if (isNewspaperMode) {
+                // 報紙模式：精細黑白半調網點印刷紋理
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.13)';
+                const dotSpacing = 5 * scale;
+                for (let dx = -hw - 4 * scale; dx < hw + 4 * scale; dx += dotSpacing) {
+                    for (let dy = -hh - 4 * scale; dy < hh + 4 * scale; dy += dotSpacing) {
+                        ctx.beginPath();
+                        const offset = (Math.floor(dy / dotSpacing) % 2 === 0) ? dotSpacing / 2 : 0;
+                        ctx.arc(dx + offset, dy, 1.2 * scale, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            } else {
+                // 原彩色模式：雜誌印刷平行微網線
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)';
+                ctx.lineWidth = 1 * scale;
+                for (let j = -hh; j < hh; j += 4 * scale) {
+                    ctx.beginPath();
+                    ctx.moveTo(-hw, j);
+                    ctx.lineTo(hw, j);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore(); // 恢復剪裁與落影
+        }
+
+        // --- 舊模式：幾何不規則多邊形切割演算法 (支援 Scale) ---
+        function createJaggedPath(path, x1, y1, x2, y2, segments = 5, variance = 10) {
+            for (let i = 1; i <= segments; i++) {
+                const t = i / segments;
+                let nx = x1 + (x2 - x1) * t;
+                let ny = y1 + (y2 - y1) * t;
+                if (i < segments) {
+                    const dx = x2 - x1;
+                    const dy = y2 - y1;
+                    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+                    const nx_norm = -dy / len;
+                    const ny_norm = dx / len;
+                    const offset = (Math.random() - 0.5) * variance;
+                    nx += nx_norm * offset;
+                    ny += ny_norm * offset;
+                }
+                path.lineTo(nx, ny);
+            }
+        }
+
+        function generatePieces(width, height, numPieces) {
+            const cx = width / 2 + (Math.random() - 0.5) * width * 0.1;
+            const cy = height / 2 + (Math.random() - 0.5) * height * 0.1;
+            const r = Math.sqrt(width * width + height * height);
+            const pieces = [];
+            let startAngle = Math.random() * Math.PI * 2;
+            for (let i = 0; i < numPieces; i++) {
+                let angleSweep = (Math.PI * 2) / numPieces + (Math.random() - 0.5) * 0.5;
+                if (i === numPieces - 1) angleSweep = Math.PI * 2 - (pieces.length * ((Math.PI * 2) / numPieces));
+                const endAngle = startAngle + angleSweep;
+                const x1 = cx + Math.cos(startAngle) * r;
+                const y1 = cy + Math.sin(startAngle) * r;
+                const x2 = cx + Math.cos(endAngle) * r;
+                const y2 = cy + Math.sin(endAngle) * r;
+
+                const p = new Path2D();
+                p.moveTo(cx, cy);
+                createJaggedPath(p, cx, cy, x1, y1, 4, 15);
+                p.lineTo(x2, y2);
+                createJaggedPath(p, x2, y2, cx, cy, 4, 15);
+                p.closePath();
+                pieces.push(p);
+                startAngle = endAngle;
+            }
+            return pieces;
+        }
+
+        // --- 核心：無損多解析度渲染引擎 ---
+        function renderFrameToContext(ctx, f, rawText, settings, scale) {
+            const {
+                currentMode,
+                tracking,
+                partGapRatio,
+                bgProbability,
+                isNewspaperMode,
+                charOffsetLevel,
+                chaosLevel,
+                paddingFactor
+            } = settings;
+
+            const lines = rawText.split('\n');
+            let maxCols = 0;
+            lines.forEach(l => maxCols = Math.max(maxCols, Array.from(l).length));
+            if (maxCols === 0) maxCols = 1;
+
+            const charSize = 260 * scale;
+            const padding = 60 * scale;
+            const spacing = charSize + tracking * scale;
+
+            const canvasWidth = maxCols * spacing - tracking * scale + padding * 2;
+
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+
+            for (let row = 0; row < lines.length; row++) {
+                const chars = Array.from(lines[row]);
+                const rowWidth = chars.length * spacing - tracking * scale;
+                const startX = (canvasWidth - rowWidth) / 2 + (charSize / 2);
+                
+                for (let col = 0; col < chars.length; col++) {
+                    const char = chars[col];
+                    if (char.trim() === '') continue;
+
+                    const charOffsetX = (Math.random() - 0.5) * charOffsetLevel * 1.5 * scale;
+                    const charOffsetY = (Math.random() - 0.5) * charOffsetLevel * 1.5 * scale;
+                    const charAngleOffset = (Math.random() - 0.5) * (charOffsetLevel / 40) * 0.12;
+
+                    const charX = startX + col * spacing + charOffsetX;
+                    const charY = padding + row * charSize + charSize / 2 + charOffsetY;
+
+                    let useMaskForThisChar = (currentMode === 'mask');
+                    let ast = null;
+                    let parts = [];
+
+                    if (!useMaskForThisChar) {
+                        ast = getASTForChar(char);
+                        if (needsMaskFallback(ast)) {
+                            useMaskForThisChar = true;
+                        } else {
+                            parts = layoutAST(ast, 0, 0, charSize * 0.85, charSize * 0.85, partGapRatio);
+                        }
+                    }
+
+                    if (useMaskForThisChar) {
+                        // --- 幾何不規則遮罩模式 ---
+                        const numPieces = Math.floor(Math.random() * 3) + 2;
+                        const pieces = generatePieces(charSize, charSize, numPieces);
+
+                        let bgIndices = [];
+                        pieces.forEach((_, idx) => {
+                            if (Math.random() < bgProbability) {
+                                bgIndices.push(idx);
+                            }
+                        });
+                        
+                        if (bgProbability > 0 && bgIndices.length === 0) {
+                            bgIndices.push(Math.floor(Math.random() * numPieces));
+                        }
+
+                        pieces.forEach((piecePath, idx) => {
+                            ctx.save();
+                            ctx.translate(charX, charY);
+                            ctx.rotate(charAngleOffset);
+
+                            ctx.rotate((Math.random() - 0.5) * 0.1 * chaosLevel);
+                            ctx.translate((Math.random() - 0.5) * 20 * chaosLevel * scale, (Math.random() - 0.5) * 20 * chaosLevel * scale);
+
+                            const hasBg = bgIndices.includes(idx);
+                            if (hasBg && loadedBgImages.length > 0) {
+                                const bgImg = loadedBgImages[Math.floor(Math.random() * loadedBgImages.length)];
+                                drawRansomCard(ctx, 0, 0, charSize * 0.7, charSize * 0.7, bgImg, paddingFactor, isNewspaperMode, scale);
+                            }
+
+                            ctx.save();
+                            ctx.translate(-charSize/2, -charSize/2);
+                            ctx.clip(piecePath);
+                            ctx.translate(charSize/2, charSize/2);
+
+                            const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
+                            ctx.font = `900 ${charSize * 0.8}px '${fontObj.family}'`;
+                            ctx.fillStyle = '#0a0a0a';
+                            ctx.fillText(char, 0, 0);
+                            ctx.restore();
+
+                            if (hasBg) {
+                                ctx.save();
+                                ctx.translate(-charSize/2, -charSize/2);
+                                ctx.lineWidth = 1.5 * scale;
+                                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                                ctx.stroke(piecePath);
+                                ctx.restore();
+                            }
+                            ctx.restore();
+                        });
+
+                    } else {
+                        // --- 偏旁結構精確重組模式 ---
+                        const numParts = parts.length;
+
+                        let bgIndices = [];
+                        parts.forEach((_, idx) => {
+                            if (Math.random() < bgProbability) {
+                                bgIndices.push(idx);
+                            }
+                        });
+
+                        if (bgProbability > 0 && bgIndices.length === 0) {
+                            bgIndices.push(Math.floor(Math.random() * numParts));
+                        }
+
+                        ctx.save();
+                        ctx.translate(charX, charY);
+                        ctx.rotate(charAngleOffset);
+
+                        parts.forEach((part, idx) => {
+                            ctx.save();
+                            
+                            const partX = part.x + (Math.random() - 0.5) * 20 * chaosLevel * scale;
+                            const partY = part.y + (Math.random() - 0.5) * 20 * chaosLevel * scale;
+                            const partAngle = (Math.random() - 0.5) * 0.35 * chaosLevel;
+
+                            ctx.translate(partX, partY);
+                            ctx.rotate(partAngle);
+
+                            const hasBg = bgIndices.includes(idx);
+                            const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
+                            const weight = (fontObj.family.includes('Noto') || fontObj.family === 'Montserrat') ? '900' : 'normal';
+                            
+                            const baseSize = 100 * scale;
+                            ctx.font = `${weight} ${baseSize}px '${fontObj.family}'`;
+                            
+                            const metrics = ctx.measureText(part.char);
+                            const textW = metrics.width || (baseSize * 0.85);
+                            const textH = baseSize * 0.85;
+
+                            const isAlpha = /^[a-zA-Z0-9]$/.test(part.char);
+                            let displayW = part.w;
+                            let displayH = part.h;
+                            if (isAlpha && numParts === 1) {
+                                displayW = part.w * 0.65;
+                            }
+
+                            const scaleX = displayW / textW;
+                            const scaleY = displayH / textH;
+
+                            if (hasBg && loadedBgImages.length > 0) {
+                                const bgImg = loadedBgImages[Math.floor(Math.random() * loadedBgImages.length)];
+                                drawRansomCard(ctx, 0, 0, displayW, displayH, bgImg, paddingFactor, isNewspaperMode, scale);
+                            }
+
+                            ctx.fillStyle = '#0a0a0a';
+                            ctx.save();
+                            ctx.scale(scaleX, scaleY);
+                            ctx.scale(1 + (Math.random() - 0.5) * 0.04, 1 + (Math.random() - 0.5) * 0.04);
+                            ctx.fillText(part.char, 0, 0);
+                            ctx.restore();
+
+                            ctx.restore();
+                        });
+
+                        ctx.restore();
+                    }
+                }
+            }
+        }
+
+        // --- 產生預覽影格 (1.0x 快速完成) ---
+        async function generateAnimation() {
+            if (isGenerating) return;
+            isGenerating = true;
+            
+            clearInterval(previewInterval);
+            ui.exportActionGroup.classList.add('hidden');
+            ui.generateBtn.disabled = true;
+            ui.generateBtn.className = "w-full bg-neutral-900 text-neutral-500 py-3 rounded font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
+            ui.generateBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                準備排版中...
+            `;
+            
+            ui.statusArea.classList.remove('hidden');
+            ui.statusArea.classList.add('flex');
+            ui.statusText.innerText = '正在精心排版中...';
+            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200"; // 重置為黑白極簡樣式
+            ui.progressBar.style.width = '0%';
+            ui.progressText.innerText = '0%';
+
+            await new Promise(r => setTimeout(r, 50));
+
+            const rawText = ui.textInput.value || '請輸入文字';
+            const fps = parseInt(ui.fpsInput.value);
+            const duration = parseInt(ui.durationInput.value);
+            const totalFrames = fps * duration;
+
+            const settings = {
+                currentMode,
+                tracking: parseInt(ui.trackingInput.value),
+                partGapRatio: parseInt(ui.partGapInput.value) / 100,
+                bgProbability: parseInt(ui.bgChanceInput.value) / 100,
+                isNewspaperMode: ui.newspaperModeToggle.checked,
+                charOffsetLevel: parseInt(ui.charOffsetInput.value),
+                chaosLevel: parseInt(ui.chaosInput.value) / 100,
+                paddingFactor: parseInt(ui.bgPaddingInput.value) / 100
+            };
+
+            const lines = rawText.split('\n');
+            let maxCols = 0;
+            lines.forEach(l => maxCols = Math.max(maxCols, Array.from(l).length));
+            if (maxCols === 0) maxCols = 1;
+
+            const charSize = 260; 
+            const padding = 60;
+            const spacing = charSize + settings.tracking;
+            const canvasWidth = maxCols * spacing - settings.tracking + padding * 2;
+            const canvasHeight = lines.length * charSize + padding * 2;
+
+            const renderCanvas = document.createElement('canvas');
+            renderCanvas.width = canvasWidth;
+            renderCanvas.height = canvasHeight;
+            const ctx = renderCanvas.getContext('2d');
+
+            precomputedFrames = [];
+
+            // 逐幀預先快取 (1.0x 快速完成)
+            for (let f = 0; f < totalFrames; f++) {
+                ctx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
+                renderFrameToContext(ctx, f, rawText, settings, 1.0);
+                precomputedFrames.push(ctx.getImageData(0, 0, renderCanvas.width, renderCanvas.height));
+
+                const percent = Math.round(((f + 1) / totalFrames) * 100);
+                ui.progressBar.style.width = `${percent}%`;
+                ui.progressText.innerText = `${percent}%`;
+                
+                if (f % 4 === 0) await new Promise(r => setTimeout(r, 0));
+            }
+
+            ui.statusArea.classList.remove('flex');
+            ui.statusArea.classList.add('hidden');
+            
+            ui.generateBtn.disabled = false;
+            ui.generateBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg hover:shadow-white/10 flex items-center justify-center gap-2";
+            ui.generateBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                重新產生
+            `;
+            ui.exportActionGroup.classList.remove('hidden');
+            ui.exportActionGroup.classList.add('flex');
+
+            isGenerating = false;
+
+            startPreviewLoop(fps);
+        }
+
+        // --- 預覽播放 (1x 順跑) ---
+        function startPreviewLoop(fps) {
+            const canvas = ui.previewCanvas;
+            const ctx = canvas.getContext('2d');
+            
+            if (precomputedFrames.length === 0) return;
+
+            canvas.width = precomputedFrames[0].width;
+            canvas.height = precomputedFrames[0].height;
+
+            let currentFrameIndex = 0;
+            
+            previewInterval = setInterval(() => {
+                ctx.putImageData(precomputedFrames[currentFrameIndex], 0, 0);
+                currentFrameIndex = (currentFrameIndex + 1) % precomputedFrames.length;
+            }, 1000 / fps);
+        }
+
+        // --- 輔助：Data URL 轉為 Blob 下載 ---
+        function dataURLtoBlob(dataurl) {
+            var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
+                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
+            while(n--){
+                u8arr[n] = bstr.charCodeAt(n);
+            }
+            return new Blob([u8arr], {type:mime});
+        }
+
+        // --- 匯出：帶有透明通道的透明 GIF 動圖 (AE專用，帶有全自動載入與 Web Worker 旁路保護) ---
+        async function exportGIF() {
+            if (precomputedFrames.length === 0) return;
+
+            const webmBtn = ui.exportBtn;
+            const gifBtn = ui.exportGifBtn;
+            const originalGifText = gifBtn.innerHTML;
+
+            // 鎖定 UI 按鈕，提供回饋
+            webmBtn.disabled = true;
+            gifBtn.disabled = true;
+            gifBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
+            gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 載入 GIF 引擎中...`;
+
+            // 1. 動態安全載入 gifshot 引擎 (雙軌保護)
+            const gifshotLoaded = await loadGifshot();
+            if (!gifshotLoaded) {
+                // 如果所有 CDN 連線皆宣告失敗，則在狀態欄紅字報錯，並解鎖按鈕
+                ui.statusArea.classList.remove('hidden');
+                ui.statusArea.classList.add('flex');
+                ui.statusText.innerText = '無法加載 GIF 編碼引擎，請檢查網路連線。';
+                ui.progressBar.className = 'bg-red-600 h-full w-full transition-all';
+                ui.progressText.innerText = 'ERR';
+                
+                webmBtn.disabled = false;
+                gifBtn.disabled = false;
+                gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
+                gifBtn.innerHTML = originalGifText;
+                return;
+            }
+
+            // 加載成功，將進度條重置
+            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200";
+
+            gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 影格高精渲染中...`;
+
+            const rawText = ui.textInput.value || '請輸入文字';
+            const fps = parseInt(ui.fpsInput.value);
+            const duration = parseInt(ui.durationInput.value);
+            const totalFrames = fps * duration;
+
+            // 智慧防當機：限制 GIF 導出尺寸為最適 1080p FHD (2x)
+            let chosenScale = parseFloat(ui.exportScaleInput.value);
+            if (chosenScale > 2.0) {
+                chosenScale = 2.0; 
+            }
+
+            const settings = {
+                currentMode,
+                tracking: parseInt(ui.trackingInput.value),
+                partGapRatio: parseInt(ui.partGapInput.value) / 100,
+                bgProbability: parseInt(ui.bgChanceInput.value) / 100,
+                isNewspaperMode: ui.newspaperModeToggle.checked,
+                charOffsetLevel: parseInt(ui.charOffsetInput.value),
+                chaosLevel: parseInt(ui.chaosInput.value) / 100,
+                paddingFactor: parseInt(ui.bgPaddingInput.value) / 100
+            };
+
+            const lines = rawText.split('\n');
+            let maxCols = 0;
+            lines.forEach(l => maxCols = Math.max(maxCols, Array.from(l).length));
+            if (maxCols === 0) maxCols = 1;
+
+            const charSize = 260; 
+            const padding = 60;
+            const spacing = charSize + settings.tracking;
+            const baseWidth = maxCols * spacing - settings.tracking + padding * 2;
+            const baseHeight = lines.length * charSize + padding * 2;
+
+            const finalW = baseWidth * chosenScale;
+            const finalH = baseHeight * chosenScale;
+
+            ui.statusArea.classList.remove('hidden');
+            ui.statusArea.classList.add('flex');
+            ui.statusText.innerText = '正在生成高精度 GIF 影格...';
+            ui.progressBar.style.width = '0%';
+            ui.progressText.innerText = '0%';
+
+            // 1. 離線無損渲染各影格透明 PNG DataURL
+            const gifFramesDataURLs = [];
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = finalW;
+            tempCanvas.height = finalH;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            for (let i = 0; i < totalFrames; i++) {
+                tempCtx.clearRect(0, 0, finalW, finalH);
+                renderFrameToContext(tempCtx, i, rawText, settings, chosenScale);
+                
+                gifFramesDataURLs.push(tempCanvas.toDataURL('image/png'));
+
+                const percent = Math.round(((i + 1) / totalFrames) * 40); // 渲染階段佔前 40%
+                ui.progressBar.style.width = `${percent}%`;
+                ui.progressText.innerText = `${percent}%`;
+
+                if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
+            }
+
+            ui.statusText.innerText = '多執行緒透明 GIF 去背編碼中...';
+
+            // 2. 啟動編碼器
+            gifshot.createGIF({
+                images: gifFramesDataURLs,
+                gifWidth: finalW,
+                gifHeight: finalH,
+                interval: 1 / fps,
+                numFrames: totalFrames,
+                transparent: true, // 保留去背透明度
+                numWorkers: 0,     // 關鍵修復：設為 0 禁用 Web Workers，改用主執行緒單執行緒渲染。能完美解決 iframe 沙盒安全限制 (SecurityError: Failed to construct 'Worker') 導致的靜默失敗或無反應。
+                progress: function(percent) {
+                    const totalPercent = Math.round(40 + percent * 60);
+                    ui.progressBar.style.width = `${totalPercent}%`;
+                    ui.progressText.innerText = `${totalPercent}%`;
+                }
+            }, function(obj) {
+                ui.statusArea.classList.add('hidden');
+
+                if (!obj.error) {
+                    const blob = dataURLtoBlob(obj.image);
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `ransom_title_transparent_${Date.now()}.gif`;
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 500);
+                } else {
+                    console.error("GIF generation failed:", obj.error);
+                    ui.statusArea.classList.remove('hidden');
+                    ui.statusArea.classList.add('flex');
+                    ui.statusText.innerText = `GIF 匯出出錯: ${obj.error}`;
+                    ui.progressBar.className = 'bg-red-600 h-full w-full';
+                }
+
+                // 解鎖 UI 按鈕
+                webmBtn.disabled = false;
+                gifBtn.disabled = false;
+                gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
+                gifBtn.innerHTML = originalGifText;
+            });
+        }
+
+        // --- 匯出帶有透明通道的 WebM 影片 ---
+        async function exportVideo() {
+            if (precomputedFrames.length === 0) return;
+            
+            const webmBtn = ui.exportBtn;
+            const gifBtn = ui.exportGifBtn;
+            const originalContent = webmBtn.innerHTML;
+            
+            webmBtn.disabled = true;
+            gifBtn.disabled = true;
+            webmBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
+            webmBtn.innerHTML = `<svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> WebM 影片編碼中...`;
+
+            const rawText = ui.textInput.value || '請輸入文字';
+            const fps = parseInt(ui.fpsInput.value);
+            const duration = parseInt(ui.durationInput.value);
+            const totalFrames = fps * duration;
+            const exportScale = parseFloat(ui.exportScaleInput.value);
+
+            const settings = {
+                currentMode,
+                tracking: parseInt(ui.trackingInput.value),
+                partGapRatio: parseInt(ui.partGapInput.value) / 100,
+                bgProbability: parseInt(ui.bgChanceInput.value) / 100,
+                isNewspaperMode: ui.newspaperModeToggle.checked,
+                charOffsetLevel: parseInt(ui.charOffsetInput.value),
+                chaosLevel: parseInt(ui.chaosInput.value) / 100,
+                paddingFactor: parseInt(ui.bgPaddingInput.value) / 100
+            };
+
+            const lines = rawText.split('\n');
+            let maxCols = 0;
+            lines.forEach(l => maxCols = Math.max(maxCols, Array.from(l).length));
+            if (maxCols === 0) maxCols = 1;
+
+            const charSize = 260; 
+            const padding = 60;
+            const spacing = charSize + settings.tracking;
+            const baseWidth = maxCols * spacing - settings.tracking + padding * 2;
+            const baseHeight = lines.length * charSize + padding * 2;
+
+            const recordCanvas = document.createElement('canvas');
+            recordCanvas.width = baseWidth * exportScale;
+            recordCanvas.height = baseHeight * exportScale;
+            const ctx = recordCanvas.getContext('2d');
+
+            let mimeType = 'video/webm; codecs=vp9';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'video/webm; codecs=vp8';
+                console.warn('您的瀏覽器不支援 VP9 透明編碼，將自動使用 VP8。');
+            }
+
+            const stream = recordCanvas.captureStream(fps);
+            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 80000000 }); 
+            const chunks = [];
+
+            recorder.ondataavailable = e => {
+                if (e.data.size > 0) chunks.push(e.data);
+            };
+
+            const recordingFinished = new Promise(resolve => {
+                recorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: mimeType });
+                    resolve(blob);
+                };
+            });
+
+            recorder.start();
+
+            ui.statusArea.classList.remove('hidden');
+            ui.statusArea.classList.add('flex');
+            ui.statusText.innerText = '正在生成高畫質 WebM 影格...';
+            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200";
+
+            for (let i = 0; i < totalFrames; i++) {
+                ctx.clearRect(0, 0, recordCanvas.width, recordCanvas.height);
+                renderFrameToContext(ctx, i, rawText, settings, exportScale);
+
+                const percent = Math.round(((i + 1) / totalFrames) * 100);
+                ui.progressBar.style.width = `${percent}%`;
+                ui.progressText.innerText = `${percent}%`;
+
+                await new Promise(r => setTimeout(r, 1000 / fps));
+            }
+
+            recorder.stop();
+            const blob = await recordingFinished;
+
+            ui.statusArea.classList.add('hidden');
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `ransom_title_${exportScale}x_${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                webmBtn.disabled = false;
+                gifBtn.disabled = false;
+                webmBtn.className = "w-full bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
+                webmBtn.innerHTML = originalContent;
+            }, 500);
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

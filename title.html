@@ -198,7 +198,7 @@
                 </button>
                 <button id="exportGifBtn" class="w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    匯出透明 GIF 動圖 (AE專用)
+                    匯出動圖 (優先 GIF / 備用 WebM)
                 </button>
             </div>
         </div>
@@ -255,7 +255,7 @@
             '辦': '⿲辛力辛',
             '法': '⿰氵去',
             '家': '⿱宀豕',
-            '世': '⿻廿凵', // 偵測到疊加符號將自動進行安全降級
+            '世': '⿻廿凵',
             '人': '人',
             '口': '口',
             '手': '手',
@@ -269,31 +269,19 @@
             '器': '⿱吅⿰⿱十口吅'
         };
 
-        // 替換特殊部首字元，使其在標準 Google 字體中可漂亮渲染出來
         const glyphOverrides = {
-            '𧾷': '足',
-            '飠': '食',
-            '糹': '糸',
-            '亻': '人',
-            '彳': '行',
-            '氵': '水',
-            '灬': '火',
-            '犭': '犬',
-            '⻏': '邑',
-            '⻖': '阜',
-            '宀': '宀',
-            '辶': '辵',
-            '𦾏': '若',
-            '𡗗': '春'
+            '𧾷': '足', '飠': '食', '糹': '糸', '亻': '人', '彳': '行',
+            '氵': '水', '灬': '火', '犭': '犬', '⻏': '邑', '⻖': '阜',
+            '宀': '宀', '辶': '辵', '𦾏': '若', '𡗗': '春'
         };
 
         let loadedBgImages = [];
-        let precomputedFrames = []; // 儲存預覽用 ImageData (始終保持在 1x 輕量解析度)
+        let precomputedFrames = []; 
         let previewInterval = null;
         let isGenerating = false;
-        let currentMode = 'decomp'; // 'decomp' (部件重組) 或 'mask' (幾何遮罩)
-        let textColorMode = 'black'; // 'black' (墨黑字) 或 'white' (極白字)
-        let decompData = null; // 儲存漢字拆解資料
+        let currentMode = 'decomp'; 
+        let textColorMode = 'black';
+        let decompData = null; 
 
         // --- DOM 元素 ---
         const ui = {
@@ -350,7 +338,6 @@
 
         ui.modeDecomp.addEventListener('click', () => setMode('decomp'));
         ui.modeMask.addEventListener('click', () => setMode('mask'));
-
         ui.colorModeBlack.addEventListener('click', () => setTextColorMode('black'));
         ui.colorModeWhite.addEventListener('click', () => setTextColorMode('white'));
 
@@ -365,9 +352,7 @@
                 ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
                 ui.modeDesc.innerText = '將文字用隨機多邊形切割成碎片，視覺上模擬手工剪紙效果。';
             }
-            if (!ui.generateBtn.disabled && !isGenerating) {
-                generateAnimation();
-            }
+            if (!ui.generateBtn.disabled && !isGenerating) generateAnimation();
         }
 
         function setTextColorMode(mode) {
@@ -381,39 +366,42 @@
                 ui.colorModeBlack.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
                 ui.colorModeDesc.innerText = '啟用深底專用高亮白字！自動反轉紙張顏色與背景雜誌圖案、網點，確保在純黑或極暗 MV 影片底色上能完美突顯。';
             }
-            if (!ui.generateBtn.disabled && !isGenerating) {
-                generateAnimation();
-            }
+            if (!ui.generateBtn.disabled && !isGenerating) generateAnimation();
         }
 
-        // --- 強悍的三層備援 GIF 載入引擎 (解決 Netlify/Github Pages CSP 阻擋問題) ---
+        // --- 全自動以「輸入文字」當作匯出檔名的智慧命名器 ---
+        function getCustomFileName(extension) {
+            const rawText = ui.textInput.value || 'RansomTitle';
+            // 將多行替換為底線，移除非法字元與多餘空白
+            let safeText = rawText.replace(/[\r\n]+/g, '_').replace(/[<>:"/\\|?*]+/g, '').replace(/\s+/g, '_');
+            safeText = safeText.substring(0, 15).replace(/_$/, ''); // 限制長度，保持檔名整潔
+            if (!safeText) safeText = 'RansomTitle';
+            return `${safeText}.${extension}`;
+        }
+
+        // --- 強悍的三層備援 GIF 載入引擎 ---
         async function loadGifshot() {
-            if (window.gifshot) return true; // 已載入則直接回傳
-            
+            if (window.gifshot) return true;
             const cdns = [
                 'https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js',
                 'https://unpkg.com/gifshot@0.4.5/build/gifshot.min.js',
                 'https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js'
             ];
-            
             for (const url of cdns) {
                 try {
-                    // 策略一：標準 Script 標籤注入
                     await new Promise((resolve, reject) => {
                         const script = document.createElement('script');
                         script.src = url;
                         script.crossOrigin = 'anonymous';
-                        script.onload = () => setTimeout(resolve, 50); // 給予引擎初始化的緩衝時間
+                        script.onload = () => setTimeout(resolve, 50); 
                         script.onerror = reject;
                         document.head.appendChild(script);
                     });
                     if (window.gifshot) return true;
                 } catch (e) {
-                    console.warn(`[策略1] 腳本動態載入失敗: ${url}，嘗試 Fetch 強制注入策略...`);
+                    console.warn(`[策略1] 動態載入失敗: ${url}`);
                 }
-
                 try {
-                    // 策略二：Fetch 文字後強力注入 (可繞過部分嚴格的 CSP 或防護軟體)
                     const res = await fetch(url);
                     if (res.ok) {
                         const code = await res.text();
@@ -423,10 +411,9 @@
                         if (window.gifshot) return true;
                     }
                 } catch(err) {
-                    console.warn(`[策略2] Fetch 備援載入失敗: ${url}`);
+                    console.warn(`[策略2] Fetch 備援失敗: ${url}`);
                 }
             }
-            
             return !!window.gifshot;
         }
 
@@ -443,21 +430,19 @@
                 });
             });
 
-            const fontLoadPromise = document.fonts.ready.catch(e => console.warn("Font loading wait failed, continuing anyway."));
+            const fontLoadPromise = document.fonts.ready.catch(e => console.warn("Font load wait failed."));
 
-            // 載入 Picsum 圖片 (模擬豐富色彩的雜誌、海報與報章材料)
             const bgPromises = [];
             for (let i = 0; i < 12; i++) {
                 bgPromises.push(new Promise((resolve) => {
                     const img = new Image();
-                    img.crossOrigin = 'Anonymous'; // 確保不會觸發 Canvas CORS 污染
+                    img.crossOrigin = 'Anonymous'; 
                     img.onload = () => resolve(img);
                     img.onerror = () => resolve(null);
                     img.src = `https://picsum.photos/${450 + i * 15}/${450 + i * 15}?random=${Math.random()}`;
                 }));
             }
 
-            // 載入字典數據庫
             const decompPromise = fetch('https://cdn.jsdelivr.net/gh/skishore/makemeahanzi@master/dictionary.txt')
                 .then(res => res.text())
                 .then(text => {
@@ -473,12 +458,8 @@
                     });
                     return data;
                 })
-                .catch(e => {
-                    console.error("Failed to load decomposition data, fallback to local database:", e);
-                    return {};
-                });
+                .catch(e => ({}));
 
-            // 背景預載 GIF 引擎，確保使用者點擊時零延遲
             loadGifshot().catch(() => {});
 
             ui.statusArea.classList.remove('hidden');
@@ -517,33 +498,24 @@
                 if (char >= '\u2FF0' && char <= '\u2FFB') {
                     const op = char;
                     if (op === '⿲' || op === '⿳') {
-                        const c1 = parseNode();
-                        const c2 = parseNode();
-                        const c3 = parseNode();
+                        const c1 = parseNode(); const c2 = parseNode(); const c3 = parseNode();
                         return { op, children: [c1, c2, c3] };
                     } else {
-                        const c1 = parseNode();
-                        const c2 = parseNode();
+                        const c1 = parseNode(); const c2 = parseNode();
                         return { op, children: [c1, c2] };
                     }
                 } else {
                     return { op: 'leaf', char };
                 }
             }
-
             return parseNode();
         }
 
         function getASTForChar(char, depth = 0, maxDepth = 2) {
             let decompStr = localDecomp[char];
-            if (!decompStr && decompData && decompData[char]) {
-                decompStr = decompData[char];
-            }
-
-            if (!decompStr || depth >= maxDepth) {
-                return { op: 'leaf', char };
-            }
-
+            if (!decompStr && decompData && decompData[char]) decompStr = decompData[char];
+            if (!decompStr || depth >= maxDepth) return { op: 'leaf', char };
+            
             const ast = parseIDS(decompStr);
             if (!ast) return { op: 'leaf', char };
 
@@ -560,13 +532,11 @@
                 }
                 return node;
             }
-
             return resolveTree(ast, depth);
         }
 
         function needsMaskFallback(node) {
             if (!node) return false;
-            
             if (node.op === 'leaf') {
                 const code = node.char.charCodeAt(0);
                 const isStandardCJK = code >= 0x4E00 && code <= 0x9FFF;
@@ -574,12 +544,8 @@
                 const isAlphanumeric = /^[a-zA-Z0-9]$/.test(node.char);
                 return (!isStandardCJK && !inOverride && !isAlphanumeric);
             }
-
             const supportedOps = ['⿰', '⿱', '⿲', '⿳'];
-            if (!supportedOps.includes(node.op)) {
-                return true;
-            }
-
+            if (!supportedOps.includes(node.op)) return true;
             if (node.children) {
                 for (let child of node.children) {
                     if (needsMaskFallback(child)) return true;
@@ -588,18 +554,12 @@
             return false;
         }
 
-        // --- 遞迴計算部件的排版邊界與比例 (支援動態間距與 Scale) ---
         function layoutAST(node, x, y, w, h, gapRatio, results = []) {
             if (!node) return results;
-
             if (node.op === 'leaf') {
-                results.push({
-                    char: glyphOverrides[node.char] || node.char,
-                    x, y, w, h
-                });
+                results.push({ char: glyphOverrides[node.char] || node.char, x, y, w, h });
                 return results;
             }
-
             const children = node.children;
             if (!children || children.length === 0) return results;
 
@@ -631,36 +591,29 @@
                     layoutAST(children[1], x, y, w * 0.55, h * 0.55, gapRatio, results);
                 }
             }
-
             return results;
         }
 
-        // --- 繪製隨機「手剪感」的偏旁背景卡 (支援黑白報紙半調網點濾鏡、Scale 縮放與白字模式優化) ---
         function drawRansomCard(ctx, x, y, w, h, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode) {
             ctx.save();
-            ctx.translate(x, y); // 轉移至局部基準中心
+            ctx.translate(x, y); 
             
-            // 根據部件的長寬與邊距縮放背景
             const cardW = w * paddingFactor;
             const cardH = h * paddingFactor;
             const hw = cardW / 2;
             const hh = cardH / 2;
 
-            // 1. 3D 立體浮起陰影 (等比例縮放)
-            // 修正：在任何模式下，物理陰影永遠是深色的（光線遮擋）。
-            // 這裡統一使用真實的深色暗影，並在白字深底模式下稍微調高暗度，以完美突顯手剪卡的立體切割感。
             ctx.shadowColor = textColorMode === 'white' ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.4)';
             ctx.shadowBlur = 12 * scale;
             ctx.shadowOffsetX = 3 * scale;
             ctx.shadowOffsetY = 5 * scale;
 
-            // 2. 隨機不規則多邊形手剪裁切路徑
             const edgeNoise = Math.min(cardW, cardH) * 0.12;
             const corners = [
-                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise }, // 左上
-                { x: hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise },  // 右上
-                { x: hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise },   // 右下
-                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise }   // 左下
+                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise },
+                { x: hw + (Math.random() - 0.5) * edgeNoise, y: -hh + (Math.random() - 0.5) * edgeNoise },
+                { x: hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise },
+                { x: -hw + (Math.random() - 0.5) * edgeNoise, y: hh + (Math.random() - 0.5) * edgeNoise }
             ];
 
             ctx.beginPath();
@@ -674,75 +627,57 @@
             }
             ctx.closePath();
 
-            // 紙張底板基底色調 (白字模式下使用深灰/深黑色，讓白字反差出來)
             if (textColorMode === 'white') {
                 ctx.fillStyle = isNewspaperMode ? '#151515' : '#1c1c1e';
             } else {
                 ctx.fillStyle = isNewspaperMode ? '#f0f0f0' : '#fbf9f5';
             }
             ctx.fill();
-
-            // 限制繪製範圍，裁切裡面的彩色局部圖片
             ctx.clip();
 
-            // 3. 繪製高倍率「局部放大」雜誌彩頁細節
             if (bgImg) {
                 ctx.save();
-                
-                // 報紙模式：套用黑白、高對比濾鏡
                 if (isNewspaperMode) {
                     if (textColorMode === 'white') {
-                        // 白字模式下：反轉色彩再進行高對比灰階，產生極具藝術感的深色報紙背景
                         ctx.filter = 'invert(100%) grayscale(100%) contrast(160%) brightness(50%)';
                     } else {
                         ctx.filter = 'grayscale(100%) contrast(160%) brightness(100%)';
                     }
                 } else {
                     if (textColorMode === 'white') {
-                        // 白字彩色模式：反轉色相並降低亮度，創造高質感深色迷幻背景，非常適合暗調 MV
                         ctx.filter = 'invert(100%) brightness(60%) contrast(140%)';
                     }
                 }
 
-                // 只取原圖非常窄小的一部分 (約 8% ~ 16%) 進行極致拉伸
                 const cropPercent = 0.08 + Math.random() * 0.08;
                 const cropW = bgImg.width * cropPercent;
                 const cropH = bgImg.height * cropPercent;
-                
-                // 確保截取區域不溢出
                 const cropX = Math.random() * (bgImg.width - cropW);
                 const cropY = Math.random() * (bgImg.height - cropH);
 
-                // 全角度隨機旋轉，使字卡內花紋完全抽象化
                 ctx.rotate((Math.random() - 0.5) * Math.PI * 2);
                 ctx.scale(1.3, 1.3);
                 ctx.drawImage(bgImg, cropX, cropY, cropW, cropH, -hw, -hh, cardW, cardH);
                 ctx.restore();
             } else {
-                // 如果沒有圖片載入成功，使用純色底牌
                 let defaultColors;
                 if (textColorMode === 'white') {
-                    // 深色底牌色庫 (適合白字)
                     defaultColors = isNewspaperMode ? ['#1e1e1e', '#222222', '#111111', '#2c2c2c'] : ['#9b2226', '#005f73', '#0a9396', '#ae2012', '#001219', '#1a3636'];
                 } else {
-                    // 淺色底牌色庫 (適合黑字)
                     defaultColors = isNewspaperMode ? ['#555555', '#aaaaaa', '#333333', '#dddddd'] : ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557', '#f4a261'];
                 }
                 ctx.fillStyle = defaultColors[Math.floor(Math.random() * defaultColors.length)];
                 ctx.fillRect(-hw, -hh, cardW, cardH);
             }
 
-            // 4. 米色報紙光澤塗層
             if (textColorMode === 'white') {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 白字模式稍作壓暗，增強白字對比度
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
             } else {
                 ctx.fillStyle = isNewspaperMode ? 'rgba(255, 252, 245, 0.08)' : 'rgba(254, 251, 243, 0.15)';
             }
             ctx.fillRect(-hw, -hh, cardW, cardH);
 
-            // 5. 印刷網格與網點紋理 (在 4K 下會自適應放大)
             if (isNewspaperMode) {
-                // 報紙模式：精細黑白半調網點印刷紋理
                 ctx.fillStyle = textColorMode === 'white' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.13)';
                 const dotSpacing = 5 * scale;
                 for (let dx = -hw - 4 * scale; dx < hw + 4 * scale; dx += dotSpacing) {
@@ -754,7 +689,6 @@
                     }
                 }
             } else {
-                // 原彩色模式：雜誌印刷平行微網線
                 ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.07)';
                 ctx.lineWidth = 1 * scale;
                 for (let j = -hh; j < hh; j += 4 * scale) {
@@ -765,7 +699,6 @@
                 }
             }
 
-            // 6. 邊界細線：白字模式下特別加強紙張的邊緣高光（Catchlight），凸顯撕紙厚度
             if (textColorMode === 'white') {
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
                 ctx.lineWidth = 1 * scale;
@@ -776,10 +709,9 @@
                 ctx.stroke();
             }
 
-            ctx.restore(); // 恢復剪裁與落影
+            ctx.restore();
         }
 
-        // --- 舊模式：幾何不規則多邊形切割演算法 (支援 Scale) ---
         function createJaggedPath(path, x1, y1, x2, y2, segments = 5, variance = 10) {
             for (let i = 1; i <= segments; i++) {
                 const t = i / segments;
@@ -828,17 +760,7 @@
 
         // --- 核心：無損多解析度渲染引擎 ---
         function renderFrameToContext(ctx, f, rawText, settings, scale) {
-            const {
-                currentMode,
-                textColorMode, // <--- 讀取字色設定
-                tracking,
-                partGapRatio,
-                bgProbability,
-                isNewspaperMode,
-                charOffsetLevel,
-                chaosLevel,
-                paddingFactor
-            } = settings;
+            const { currentMode, textColorMode, tracking, partGapRatio, bgProbability, isNewspaperMode, charOffsetLevel, chaosLevel, paddingFactor } = settings;
 
             const lines = rawText.split('\n');
             let maxCols = 0;
@@ -884,20 +806,12 @@
                     }
 
                     if (useMaskForThisChar) {
-                        // --- 幾何不規則遮罩模式 ---
                         const numPieces = Math.floor(Math.random() * 3) + 2;
                         const pieces = generatePieces(charSize, charSize, numPieces);
 
                         let bgIndices = [];
-                        pieces.forEach((_, idx) => {
-                            if (Math.random() < bgProbability) {
-                                bgIndices.push(idx);
-                            }
-                        });
-                        
-                        if (bgProbability > 0 && bgIndices.length === 0) {
-                            bgIndices.push(Math.floor(Math.random() * numPieces));
-                        }
+                        pieces.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
+                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * numPieces));
 
                         pieces.forEach((piecePath, idx) => {
                             ctx.save();
@@ -920,7 +834,7 @@
 
                             const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
                             ctx.font = `900 ${charSize * 0.8}px '${fontObj.family}'`;
-                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; // 白字/黑字套用
+                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; 
                             ctx.fillText(char, 0, 0);
                             ctx.restore();
 
@@ -928,7 +842,6 @@
                                 ctx.save();
                                 ctx.translate(-charSize/2, -charSize/2);
                                 ctx.lineWidth = 1.5 * scale;
-                                // 邊線同樣配合白字優化
                                 ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
                                 ctx.stroke(piecePath);
                                 ctx.restore();
@@ -937,19 +850,10 @@
                         });
 
                     } else {
-                        // --- 偏旁結構精確重組模式 ---
                         const numParts = parts.length;
-
                         let bgIndices = [];
-                        parts.forEach((_, idx) => {
-                            if (Math.random() < bgProbability) {
-                                bgIndices.push(idx);
-                            }
-                        });
-
-                        if (bgProbability > 0 && bgIndices.length === 0) {
-                            bgIndices.push(Math.floor(Math.random() * numParts));
-                        }
+                        parts.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
+                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * numParts));
 
                         ctx.save();
                         ctx.translate(charX, charY);
@@ -991,7 +895,7 @@
                                 drawRansomCard(ctx, 0, 0, displayW, displayH, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode);
                             }
 
-                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; // 白字/黑字套用
+                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; 
                             ctx.save();
                             ctx.scale(scaleX, scaleY);
                             ctx.scale(1 + (Math.random() - 0.5) * 0.04, 1 + (Math.random() - 0.5) * 0.04);
@@ -1000,14 +904,12 @@
 
                             ctx.restore();
                         });
-
                         ctx.restore();
                     }
                 }
             }
         }
 
-        // --- 產生預覽影格 (1.0x 快速完成) ---
         async function generateAnimation() {
             if (isGenerating) return;
             isGenerating = true;
@@ -1027,7 +929,7 @@
             ui.statusArea.classList.remove('hidden');
             ui.statusArea.classList.add('flex');
             ui.statusText.innerText = '正在精心排版中...';
-            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200"; // 重置為黑白極簡樣式
+            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200"; 
             ui.progressBar.style.width = '0%';
             ui.progressText.innerText = '0%';
 
@@ -1039,8 +941,7 @@
             const totalFrames = fps * duration;
 
             const settings = {
-                currentMode,
-                textColorMode, // <--- 傳入字色設定
+                currentMode, textColorMode, 
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,
@@ -1068,7 +969,6 @@
 
             precomputedFrames = [];
 
-            // 逐幀預先快取 (1.0x 快速完成)
             for (let f = 0; f < totalFrames; f++) {
                 ctx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
                 renderFrameToContext(ctx, f, rawText, settings, 1.0);
@@ -1077,13 +977,11 @@
                 const percent = Math.round(((f + 1) / totalFrames) * 100);
                 ui.progressBar.style.width = `${percent}%`;
                 ui.progressText.innerText = `${percent}%`;
-                
                 if (f % 4 === 0) await new Promise(r => setTimeout(r, 0));
             }
 
             ui.statusArea.classList.remove('flex');
             ui.statusArea.classList.add('hidden');
-            
             ui.generateBtn.disabled = false;
             ui.generateBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg hover:shadow-white/10 flex items-center justify-center gap-2";
             ui.generateBtn.innerHTML = `
@@ -1092,41 +990,31 @@
             `;
             ui.exportActionGroup.classList.remove('hidden');
             ui.exportActionGroup.classList.add('flex');
-
             isGenerating = false;
-
             startPreviewLoop(fps);
         }
 
-        // --- 預覽播放 (1x 順跑) ---
         function startPreviewLoop(fps) {
             const canvas = ui.previewCanvas;
             const ctx = canvas.getContext('2d');
-            
             if (precomputedFrames.length === 0) return;
-
             canvas.width = precomputedFrames[0].width;
             canvas.height = precomputedFrames[0].height;
-
             let currentFrameIndex = 0;
-            
             previewInterval = setInterval(() => {
                 ctx.putImageData(precomputedFrames[currentFrameIndex], 0, 0);
                 currentFrameIndex = (currentFrameIndex + 1) % precomputedFrames.length;
             }, 1000 / fps);
         }
 
-        // --- 輔助：Data URL 轉為 Blob 下載 ---
         function dataURLtoBlob(dataurl) {
             var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
                 bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-            while(n--){
-                u8arr[n] = bstr.charCodeAt(n);
-            }
+            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
             return new Blob([u8arr], {type:mime});
         }
 
-        // --- 匯出：帶有透明通道的透明 GIF 動圖 (AE專用) ---
+        // --- 智慧 GIF 匯出與降級備援機制 ---
         async function exportGIF() {
             if (precomputedFrames.length === 0) return;
 
@@ -1134,31 +1022,35 @@
             const gifBtn = ui.exportGifBtn;
             const originalGifText = gifBtn.innerHTML;
 
-            // 鎖定 UI 按鈕
             webmBtn.disabled = true;
             gifBtn.disabled = true;
             gifBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
             gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 載入 GIF 引擎中...`;
 
-            // 1. 動態安全載入 gifshot 引擎 (強化型)
             const gifshotLoaded = await loadGifshot();
+            
+            // 🚨 自動備援降級機制：當偵測到環境不允許 GIF 引擎執行時，自動為使用者匯出透明 WebM！
             if (!gifshotLoaded) {
                 ui.statusArea.classList.remove('hidden');
                 ui.statusArea.classList.add('flex');
-                ui.statusText.innerText = '無法加載 GIF 編碼引擎，請檢查網路連線或關閉擋廣告擴充功能。';
-                ui.progressBar.className = 'bg-red-600 h-full w-full transition-all';
-                ui.progressText.innerText = 'ERR';
+                ui.statusText.innerText = '⚠️ 平台安全限制阻擋了 GIF 引擎。正為您自動匯出更高畫質的透明 WebM！(可至 ezgif.com 秒轉為 GIF)';
+                ui.progressBar.className = 'bg-yellow-500 h-full w-full transition-all';
+                ui.progressText.innerText = '自動備援';
                 
                 webmBtn.disabled = false;
                 gifBtn.disabled = false;
                 gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
                 gifBtn.innerHTML = originalGifText;
+                
+                // 自動導向完美的 WebM 匯出處理
+                setTimeout(() => {
+                    ui.statusArea.classList.add('hidden');
+                    exportVideo();
+                }, 2000);
                 return;
             }
 
-            // 加載成功，將進度條重置
             ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200";
-
             gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 影格高精渲染中...`;
 
             const rawText = ui.textInput.value || '請輸入文字';
@@ -1166,15 +1058,11 @@
             const duration = parseInt(ui.durationInput.value);
             const totalFrames = fps * duration;
 
-            // 智慧防當機：限制 GIF 導出尺寸為最適 1080p FHD (2x)
             let chosenScale = parseFloat(ui.exportScaleInput.value);
-            if (chosenScale > 2.0) {
-                chosenScale = 2.0; 
-            }
+            if (chosenScale > 2.0) chosenScale = 2.0; 
 
             const settings = {
-                currentMode,
-                textColorMode, // <--- 傳入字色設定
+                currentMode, textColorMode, 
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,
@@ -1204,7 +1092,6 @@
             ui.progressBar.style.width = '0%';
             ui.progressText.innerText = '0%';
 
-            // 1. 離線無損渲染各影格透明 PNG DataURL
             const gifFramesDataURLs = [];
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = finalW;
@@ -1215,40 +1102,42 @@
                 tempCtx.clearRect(0, 0, finalW, finalH);
                 renderFrameToContext(tempCtx, i, rawText, settings, chosenScale);
                 
-                // 【加入 Canvas 跨域 CORS 污染防護】
                 try {
                     gifFramesDataURLs.push(tempCanvas.toDataURL('image/png'));
                 } catch (e) {
                     ui.statusArea.classList.remove('hidden');
                     ui.statusArea.classList.add('flex');
-                    ui.statusText.innerText = '背景圖片遇到嚴格跨域安全限制 (CORS)，無法匯出，請嘗試重新產生。';
-                    ui.progressBar.className = 'bg-red-600 h-full w-full transition-all';
-                    ui.progressText.innerText = 'ERR';
+                    ui.statusText.innerText = '背景圖片遇到嚴格跨域安全限制 (CORS)，無法匯出。正為您自動降級匯出無背景素材的 WebM！';
+                    ui.progressBar.className = 'bg-yellow-500 h-full w-full transition-all';
+                    ui.progressText.innerText = '自動備援';
                     
                     webmBtn.disabled = false;
                     gifBtn.disabled = false;
                     gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
                     gifBtn.innerHTML = originalGifText;
+                    
+                    setTimeout(() => {
+                        ui.statusArea.classList.add('hidden');
+                        exportVideo();
+                    }, 2000);
                     return;
                 }
 
-                const percent = Math.round(((i + 1) / totalFrames) * 40); // 渲染階段佔前 40%
+                const percent = Math.round(((i + 1) / totalFrames) * 40); 
                 ui.progressBar.style.width = `${percent}%`;
                 ui.progressText.innerText = `${percent}%`;
-
                 if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
             }
 
             ui.statusText.innerText = '多執行緒透明 GIF 去背編碼中...';
 
-            // 2. 啟動編碼器 (numWorkers 設為 0 以避免沙盒 Web Worker 跨域安全阻擋)
             gifshot.createGIF({
                 images: gifFramesDataURLs,
                 gifWidth: finalW,
                 gifHeight: finalH,
                 interval: 1 / fps,
                 numFrames: totalFrames,
-                transparent: true, // 保留去背透明度
+                transparent: true, 
                 numWorkers: 0,     
                 progress: function(percent) {
                     const totalPercent = Math.round(40 + percent * 60);
@@ -1265,7 +1154,7 @@
                     const a = document.createElement('a');
                     a.style.display = 'none';
                     a.href = url;
-                    a.download = `ransom_title_transparent_${Date.now()}.gif`;
+                    a.download = getCustomFileName('gif'); // 💡 使用自訂檔名
                     document.body.appendChild(a);
                     a.click();
                     
@@ -1277,11 +1166,15 @@
                     console.error("GIF generation failed:", obj.error);
                     ui.statusArea.classList.remove('hidden');
                     ui.statusArea.classList.add('flex');
-                    ui.statusText.innerText = `GIF 匯出出錯: ${obj.error}`;
-                    ui.progressBar.className = 'bg-red-600 h-full w-full';
+                    ui.statusText.innerText = `GIF 匯出出錯。正為您自動備援匯出 WebM！`;
+                    ui.progressBar.className = 'bg-yellow-500 h-full w-full';
+                    
+                    setTimeout(() => {
+                        ui.statusArea.classList.add('hidden');
+                        exportVideo();
+                    }, 2000);
                 }
 
-                // 解鎖 UI 按鈕
                 webmBtn.disabled = false;
                 gifBtn.disabled = false;
                 gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
@@ -1300,7 +1193,7 @@
             webmBtn.disabled = true;
             gifBtn.disabled = true;
             webmBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
-            webmBtn.innerHTML = `<svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> WebM 影片編碼中...`;
+            webmBtn.innerHTML = `<svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> WebM 高畫質編碼中...`;
 
             const rawText = ui.textInput.value || '請輸入文字';
             const fps = parseInt(ui.fpsInput.value);
@@ -1309,8 +1202,7 @@
             const exportScale = parseFloat(ui.exportScaleInput.value);
 
             const settings = {
-                currentMode,
-                textColorMode, // <--- 傳入字色設定
+                currentMode, textColorMode, 
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,
@@ -1339,7 +1231,7 @@
             let mimeType = 'video/webm; codecs=vp9';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
                 mimeType = 'video/webm; codecs=vp8';
-                console.warn('您的瀏覽器不支援 VP9 透明編碼，將自動使用 VP8。');
+                console.warn('瀏覽器不支援 VP9 透明編碼，自動使用 VP8。');
             }
 
             const stream = recordCanvas.captureStream(fps);
@@ -1384,7 +1276,7 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = `ransom_title_${exportScale}x_${Date.now()}.webm`;
+            a.download = getCustomFileName('webm'); // 💡 使用自訂檔名
             document.body.appendChild(a);
             a.click();
             

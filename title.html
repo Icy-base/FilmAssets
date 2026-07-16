@@ -7,8 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入多種風格的中英文字體 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;500;900&family=Noto+Serif+TC:wght@300;700;900&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=Long+Cang&family=Klee+One:wght@400;600&family=Courier+Prime:wght@400;700&family=Montserrat:wght@400;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-    <!-- 預先在 head 靜態載入 gifshot，沙盒環境下靜態加載的成功率遠高於動態插入 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js"></script>
+    <!-- 預先在 head 靜態載入 gifshot (更換為相容性最高的 jsDelivr) -->
+    <script src="https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js"></script>
     <style>
         /* 隱藏的預載區域，確保 Canvas 繪製前字體已被瀏覽器解析 */
         #font-preload { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden; }
@@ -53,6 +53,16 @@
                 <button id="modeMask" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all">幾何遮罩 (舊)</button>
             </div>
             <p id="modeDesc" class="text-[10px] text-neutral-500 leading-relaxed">將文字拆解為精細部件，進行非等比例拉伸。遇到英文或複雜字元時將保持獨立或安全降級，確保高辨識度與美感。</p>
+        </div>
+
+        <!-- 文字底色模式 -->
+        <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-bold text-neutral-400 uppercase tracking-wider">文字底色模式</label>
+            <div class="flex bg-neutral-900 p-1 rounded border border-neutral-800">
+                <button id="colorModeBlack" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm">墨黑字 (預設)</button>
+                <button id="colorModeWhite" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all">極白字 (深底)</button>
+            </div>
+            <p id="colorModeDesc" class="text-[10px] text-neutral-500 leading-relaxed">墨黑字適合亮色底、白字模式專為深底/黑底 MV 特效設計，搭配高對比反轉背景紙張，極致防黑，清晰易讀。</p>
         </div>
 
         <!-- 文字輸入 -->
@@ -282,6 +292,7 @@
         let previewInterval = null;
         let isGenerating = false;
         let currentMode = 'decomp'; // 'decomp' (部件重組) 或 'mask' (幾何遮罩)
+        let textColorMode = 'black'; // 'black' (墨黑字) 或 'white' (極白字)
         let decompData = null; // 儲存漢字拆解資料
 
         // --- DOM 元素 ---
@@ -289,6 +300,9 @@
             modeDecomp: document.getElementById('modeDecomp'),
             modeMask: document.getElementById('modeMask'),
             modeDesc: document.getElementById('modeDesc'),
+            colorModeBlack: document.getElementById('colorModeBlack'),
+            colorModeWhite: document.getElementById('colorModeWhite'),
+            colorModeDesc: document.getElementById('colorModeDesc'),
             textInput: document.getElementById('textInput'),
             fpsInput: document.getElementById('fpsInput'),
             fpsValue: document.getElementById('fpsValue'),
@@ -337,6 +351,9 @@
         ui.modeDecomp.addEventListener('click', () => setMode('decomp'));
         ui.modeMask.addEventListener('click', () => setMode('mask'));
 
+        ui.colorModeBlack.addEventListener('click', () => setTextColorMode('black'));
+        ui.colorModeWhite.addEventListener('click', () => setTextColorMode('white'));
+
         function setMode(mode) {
             currentMode = mode;
             if (mode === 'decomp') {
@@ -353,31 +370,64 @@
             }
         }
 
-        // --- 智慧型多重 CDN GIF 載入器 (解決 sandbox 與網路失效問題) ---
+        function setTextColorMode(mode) {
+            textColorMode = mode;
+            if (mode === 'black') {
+                ui.colorModeBlack.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
+                ui.colorModeWhite.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
+                ui.colorModeDesc.innerText = '墨黑字適合亮色底、白字模式專為深底/黑底 MV 特效設計，搭配高對比反轉背景紙張，極致防黑，清晰易讀。';
+            } else {
+                ui.colorModeWhite.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
+                ui.colorModeBlack.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
+                ui.colorModeDesc.innerText = '啟用深底專用高亮白字！自動反轉紙張顏色與背景雜誌圖案、網點，確保在純黑或極暗 MV 影片底色上能完美突顯。';
+            }
+            if (!ui.generateBtn.disabled && !isGenerating) {
+                generateAnimation();
+            }
+        }
+
+        // --- 強悍的三層備援 GIF 載入引擎 (解決 Netlify/Github Pages CSP 阻擋問題) ---
         async function loadGifshot() {
-            if (typeof gifshot !== 'undefined') return true;
+            if (window.gifshot) return true; // 已載入則直接回傳
             
             const cdns = [
-                'https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js',
                 'https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js',
-                'https://unpkg.com/gifshot@0.4.5/build/gifshot.min.js'
+                'https://unpkg.com/gifshot@0.4.5/build/gifshot.min.js',
+                'https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js'
             ];
             
             for (const url of cdns) {
                 try {
+                    // 策略一：標準 Script 標籤注入
                     await new Promise((resolve, reject) => {
                         const script = document.createElement('script');
                         script.src = url;
-                        script.onload = resolve;
+                        script.crossOrigin = 'anonymous';
+                        script.onload = () => setTimeout(resolve, 50); // 給予引擎初始化的緩衝時間
                         script.onerror = reject;
                         document.head.appendChild(script);
                     });
-                    if (typeof gifshot !== 'undefined') return true;
+                    if (window.gifshot) return true;
                 } catch (e) {
-                    console.warn(`Failed to load gifshot from ${url}, trying next...`);
+                    console.warn(`[策略1] 腳本動態載入失敗: ${url}，嘗試 Fetch 強制注入策略...`);
+                }
+
+                try {
+                    // 策略二：Fetch 文字後強力注入 (可繞過部分嚴格的 CSP 或防護軟體)
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const code = await res.text();
+                        const script = document.createElement('script');
+                        script.textContent = code;
+                        document.head.appendChild(script);
+                        if (window.gifshot) return true;
+                    }
+                } catch(err) {
+                    console.warn(`[策略2] Fetch 備援載入失敗: ${url}`);
                 }
             }
-            return false;
+            
+            return !!window.gifshot;
         }
 
         // --- 初始化 (下載資源與部首偏旁) ---
@@ -400,7 +450,7 @@
             for (let i = 0; i < 12; i++) {
                 bgPromises.push(new Promise((resolve) => {
                     const img = new Image();
-                    img.crossOrigin = 'Anonymous';
+                    img.crossOrigin = 'Anonymous'; // 確保不會觸發 Canvas CORS 污染
                     img.onload = () => resolve(img);
                     img.onerror = () => resolve(null);
                     img.src = `https://picsum.photos/${450 + i * 15}/${450 + i * 15}?random=${Math.random()}`;
@@ -585,8 +635,8 @@
             return results;
         }
 
-        // --- 繪製隨機「手剪感」的偏旁背景卡 (支援黑白報紙半調網點濾鏡與 Scale 縮放) ---
-        function drawRansomCard(ctx, x, y, w, h, bgImg, paddingFactor, isNewspaperMode, scale) {
+        // --- 繪製隨機「手剪感」的偏旁背景卡 (支援黑白報紙半調網點濾鏡、Scale 縮放與白字模式優化) ---
+        function drawRansomCard(ctx, x, y, w, h, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode) {
             ctx.save();
             ctx.translate(x, y); // 轉移至局部基準中心
             
@@ -597,7 +647,9 @@
             const hh = cardH / 2;
 
             // 1. 3D 立體浮起陰影 (等比例縮放)
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+            // 修正：在任何模式下，物理陰影永遠是深色的（光線遮擋）。
+            // 這裡統一使用真實的深色暗影，並在白字深底模式下稍微調高暗度，以完美突顯手剪卡的立體切割感。
+            ctx.shadowColor = textColorMode === 'white' ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.4)';
             ctx.shadowBlur = 12 * scale;
             ctx.shadowOffsetX = 3 * scale;
             ctx.shadowOffsetY = 5 * scale;
@@ -622,8 +674,12 @@
             }
             ctx.closePath();
 
-            // 紙張側邊白邊基底 (報紙模式下紙張色調稍偏白灰色)
-            ctx.fillStyle = isNewspaperMode ? '#f0f0f0' : '#fbf9f5';
+            // 紙張底板基底色調 (白字模式下使用深灰/深黑色，讓白字反差出來)
+            if (textColorMode === 'white') {
+                ctx.fillStyle = isNewspaperMode ? '#151515' : '#1c1c1e';
+            } else {
+                ctx.fillStyle = isNewspaperMode ? '#f0f0f0' : '#fbf9f5';
+            }
             ctx.fill();
 
             // 限制繪製範圍，裁切裡面的彩色局部圖片
@@ -635,7 +691,17 @@
                 
                 // 報紙模式：套用黑白、高對比濾鏡
                 if (isNewspaperMode) {
-                    ctx.filter = 'grayscale(100%) contrast(160%) brightness(100%)';
+                    if (textColorMode === 'white') {
+                        // 白字模式下：反轉色彩再進行高對比灰階，產生極具藝術感的深色報紙背景
+                        ctx.filter = 'invert(100%) grayscale(100%) contrast(160%) brightness(50%)';
+                    } else {
+                        ctx.filter = 'grayscale(100%) contrast(160%) brightness(100%)';
+                    }
+                } else {
+                    if (textColorMode === 'white') {
+                        // 白字彩色模式：反轉色相並降低亮度，創造高質感深色迷幻背景，非常適合暗調 MV
+                        ctx.filter = 'invert(100%) brightness(60%) contrast(140%)';
+                    }
                 }
 
                 // 只取原圖非常窄小的一部分 (約 8% ~ 16%) 進行極致拉伸
@@ -653,19 +719,31 @@
                 ctx.drawImage(bgImg, cropX, cropY, cropW, cropH, -hw, -hh, cardW, cardH);
                 ctx.restore();
             } else {
-                const defaultColors = isNewspaperMode ? ['#555555', '#aaaaaa', '#333333', '#dddddd'] : ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557', '#f4a261'];
+                // 如果沒有圖片載入成功，使用純色底牌
+                let defaultColors;
+                if (textColorMode === 'white') {
+                    // 深色底牌色庫 (適合白字)
+                    defaultColors = isNewspaperMode ? ['#1e1e1e', '#222222', '#111111', '#2c2c2c'] : ['#9b2226', '#005f73', '#0a9396', '#ae2012', '#001219', '#1a3636'];
+                } else {
+                    // 淺色底牌色庫 (適合黑字)
+                    defaultColors = isNewspaperMode ? ['#555555', '#aaaaaa', '#333333', '#dddddd'] : ['#e63946', '#f1faee', '#a8dadc', '#457b9d', '#1d3557', '#f4a261'];
+                }
                 ctx.fillStyle = defaultColors[Math.floor(Math.random() * defaultColors.length)];
                 ctx.fillRect(-hw, -hh, cardW, cardH);
             }
 
-            // 4. 米色報紙光澤塗層 (彩色時保留溫暖感，報紙模式下保留微弱紙黃)
-            ctx.fillStyle = isNewspaperMode ? 'rgba(255, 252, 245, 0.08)' : 'rgba(254, 251, 243, 0.15)';
+            // 4. 米色報紙光澤塗層
+            if (textColorMode === 'white') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; // 白字模式稍作壓暗，增強白字對比度
+            } else {
+                ctx.fillStyle = isNewspaperMode ? 'rgba(255, 252, 245, 0.08)' : 'rgba(254, 251, 243, 0.15)';
+            }
             ctx.fillRect(-hw, -hh, cardW, cardH);
 
             // 5. 印刷網格與網點紋理 (在 4K 下會自適應放大)
             if (isNewspaperMode) {
                 // 報紙模式：精細黑白半調網點印刷紋理
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.13)';
+                ctx.fillStyle = textColorMode === 'white' ? 'rgba(255, 255, 255, 0.18)' : 'rgba(0, 0, 0, 0.13)';
                 const dotSpacing = 5 * scale;
                 for (let dx = -hw - 4 * scale; dx < hw + 4 * scale; dx += dotSpacing) {
                     for (let dy = -hh - 4 * scale; dy < hh + 4 * scale; dy += dotSpacing) {
@@ -677,7 +755,7 @@
                 }
             } else {
                 // 原彩色模式：雜誌印刷平行微網線
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.07)';
+                ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.07)';
                 ctx.lineWidth = 1 * scale;
                 for (let j = -hh; j < hh; j += 4 * scale) {
                     ctx.beginPath();
@@ -685,6 +763,17 @@
                     ctx.lineTo(hw, j);
                     ctx.stroke();
                 }
+            }
+
+            // 6. 邊界細線：白字模式下特別加強紙張的邊緣高光（Catchlight），凸顯撕紙厚度
+            if (textColorMode === 'white') {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+                ctx.lineWidth = 1 * scale;
+                ctx.stroke();
+            } else {
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.08)';
+                ctx.lineWidth = 0.5 * scale;
+                ctx.stroke();
             }
 
             ctx.restore(); // 恢復剪裁與落影
@@ -741,6 +830,7 @@
         function renderFrameToContext(ctx, f, rawText, settings, scale) {
             const {
                 currentMode,
+                textColorMode, // <--- 讀取字色設定
                 tracking,
                 partGapRatio,
                 bgProbability,
@@ -820,7 +910,7 @@
                             const hasBg = bgIndices.includes(idx);
                             if (hasBg && loadedBgImages.length > 0) {
                                 const bgImg = loadedBgImages[Math.floor(Math.random() * loadedBgImages.length)];
-                                drawRansomCard(ctx, 0, 0, charSize * 0.7, charSize * 0.7, bgImg, paddingFactor, isNewspaperMode, scale);
+                                drawRansomCard(ctx, 0, 0, charSize * 0.7, charSize * 0.7, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode);
                             }
 
                             ctx.save();
@@ -830,7 +920,7 @@
 
                             const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
                             ctx.font = `900 ${charSize * 0.8}px '${fontObj.family}'`;
-                            ctx.fillStyle = '#0a0a0a';
+                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; // 白字/黑字套用
                             ctx.fillText(char, 0, 0);
                             ctx.restore();
 
@@ -838,7 +928,8 @@
                                 ctx.save();
                                 ctx.translate(-charSize/2, -charSize/2);
                                 ctx.lineWidth = 1.5 * scale;
-                                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                                // 邊線同樣配合白字優化
+                                ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
                                 ctx.stroke(piecePath);
                                 ctx.restore();
                             }
@@ -897,10 +988,10 @@
 
                             if (hasBg && loadedBgImages.length > 0) {
                                 const bgImg = loadedBgImages[Math.floor(Math.random() * loadedBgImages.length)];
-                                drawRansomCard(ctx, 0, 0, displayW, displayH, bgImg, paddingFactor, isNewspaperMode, scale);
+                                drawRansomCard(ctx, 0, 0, displayW, displayH, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode);
                             }
 
-                            ctx.fillStyle = '#0a0a0a';
+                            ctx.fillStyle = textColorMode === 'white' ? '#fbfbfb' : '#0a0a0a'; // 白字/黑字套用
                             ctx.save();
                             ctx.scale(scaleX, scaleY);
                             ctx.scale(1 + (Math.random() - 0.5) * 0.04, 1 + (Math.random() - 0.5) * 0.04);
@@ -949,6 +1040,7 @@
 
             const settings = {
                 currentMode,
+                textColorMode, // <--- 傳入字色設定
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,
@@ -1034,7 +1126,7 @@
             return new Blob([u8arr], {type:mime});
         }
 
-        // --- 匯出：帶有透明通道的透明 GIF 動圖 (AE專用，帶有全自動載入與 Web Worker 旁路保護) ---
+        // --- 匯出：帶有透明通道的透明 GIF 動圖 (AE專用) ---
         async function exportGIF() {
             if (precomputedFrames.length === 0) return;
 
@@ -1042,19 +1134,18 @@
             const gifBtn = ui.exportGifBtn;
             const originalGifText = gifBtn.innerHTML;
 
-            // 鎖定 UI 按鈕，提供回饋
+            // 鎖定 UI 按鈕
             webmBtn.disabled = true;
             gifBtn.disabled = true;
             gifBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
             gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 載入 GIF 引擎中...`;
 
-            // 1. 動態安全載入 gifshot 引擎 (雙軌保護)
+            // 1. 動態安全載入 gifshot 引擎 (強化型)
             const gifshotLoaded = await loadGifshot();
             if (!gifshotLoaded) {
-                // 如果所有 CDN 連線皆宣告失敗，則在狀態欄紅字報錯，並解鎖按鈕
                 ui.statusArea.classList.remove('hidden');
                 ui.statusArea.classList.add('flex');
-                ui.statusText.innerText = '無法加載 GIF 編碼引擎，請檢查網路連線。';
+                ui.statusText.innerText = '無法加載 GIF 編碼引擎，請檢查網路連線或關閉擋廣告擴充功能。';
                 ui.progressBar.className = 'bg-red-600 h-full w-full transition-all';
                 ui.progressText.innerText = 'ERR';
                 
@@ -1083,6 +1174,7 @@
 
             const settings = {
                 currentMode,
+                textColorMode, // <--- 傳入字色設定
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,
@@ -1123,7 +1215,22 @@
                 tempCtx.clearRect(0, 0, finalW, finalH);
                 renderFrameToContext(tempCtx, i, rawText, settings, chosenScale);
                 
-                gifFramesDataURLs.push(tempCanvas.toDataURL('image/png'));
+                // 【加入 Canvas 跨域 CORS 污染防護】
+                try {
+                    gifFramesDataURLs.push(tempCanvas.toDataURL('image/png'));
+                } catch (e) {
+                    ui.statusArea.classList.remove('hidden');
+                    ui.statusArea.classList.add('flex');
+                    ui.statusText.innerText = '背景圖片遇到嚴格跨域安全限制 (CORS)，無法匯出，請嘗試重新產生。';
+                    ui.progressBar.className = 'bg-red-600 h-full w-full transition-all';
+                    ui.progressText.innerText = 'ERR';
+                    
+                    webmBtn.disabled = false;
+                    gifBtn.disabled = false;
+                    gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
+                    gifBtn.innerHTML = originalGifText;
+                    return;
+                }
 
                 const percent = Math.round(((i + 1) / totalFrames) * 40); // 渲染階段佔前 40%
                 ui.progressBar.style.width = `${percent}%`;
@@ -1134,7 +1241,7 @@
 
             ui.statusText.innerText = '多執行緒透明 GIF 去背編碼中...';
 
-            // 2. 啟動編碼器
+            // 2. 啟動編碼器 (numWorkers 設為 0 以避免沙盒 Web Worker 跨域安全阻擋)
             gifshot.createGIF({
                 images: gifFramesDataURLs,
                 gifWidth: finalW,
@@ -1142,7 +1249,7 @@
                 interval: 1 / fps,
                 numFrames: totalFrames,
                 transparent: true, // 保留去背透明度
-                numWorkers: 0,     // 關鍵修復：設為 0 禁用 Web Workers，改用主執行緒單執行緒渲染。能完美解決 iframe 沙盒安全限制 (SecurityError: Failed to construct 'Worker') 導致的靜默失敗或無反應。
+                numWorkers: 0,     
                 progress: function(percent) {
                     const totalPercent = Math.round(40 + percent * 60);
                     ui.progressBar.style.width = `${totalPercent}%`;
@@ -1203,6 +1310,7 @@
 
             const settings = {
                 currentMode,
+                textColorMode, // <--- 傳入字色設定
                 tracking: parseInt(ui.trackingInput.value),
                 partGapRatio: parseInt(ui.partGapInput.value) / 100,
                 bgProbability: parseInt(ui.bgChanceInput.value) / 100,

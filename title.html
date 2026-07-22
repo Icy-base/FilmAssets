@@ -209,9 +209,14 @@
         <div class="absolute top-4 right-4 bg-black/80 px-3 py-1.5 rounded text-[11px] text-neutral-400 border border-neutral-800 backdrop-blur-sm pointer-events-none uppercase tracking-wider">
             Live Preview (Alpha Canvas)
         </div>
+        <!-- 💡 新增：單點切換提示 -->
+        <div class="absolute top-14 right-4 bg-white/10 px-3 py-1.5 rounded text-[10px] text-white/80 border border-white/20 backdrop-blur-sm pointer-events-none">
+            🖱️ 點擊特定文字，可單獨切換 拆解/切割 模式
+        </div>
         <!-- 使用一個容器來限制 canvas 最大尺寸並保持比例 -->
         <div class="max-w-full max-h-full flex items-center justify-center overflow-hidden rounded shadow-2xl ring-1 ring-white/5 bg-transparent">
-            <canvas id="previewCanvas" class="max-w-full max-h-[80vh] object-contain"></canvas>
+            <!-- 💡 新增：游標改為 pointer 提示可點擊 -->
+            <canvas id="previewCanvas" class="max-w-full max-h-[80vh] object-contain cursor-pointer transition-all hover:ring-2 hover:ring-white/30"></canvas>
         </div>
     </div>
 
@@ -296,6 +301,10 @@
         let textColorMode = 'black';
         let decompData = null; 
 
+        // 💡 新增：用於記錄字元單獨的模式覆寫與點擊偵測的座標盒
+        let charModeOverrides = new Map();
+        let hitBoxes = [];
+
         // --- DOM 元素 ---
         const ui = {
             modeDecomp: document.getElementById('modeDecomp'),
@@ -354,8 +363,56 @@
         ui.colorModeBlack.addEventListener('click', () => setTextColorMode('black'));
         ui.colorModeWhite.addEventListener('click', () => setTextColorMode('white'));
 
+        // 💡 新增：當輸入文字改變時，清除所有局部模式覆寫設定
+        ui.textInput.addEventListener('input', () => {
+            charModeOverrides.clear();
+        });
+
+        // 💡 新增：Canvas 點擊偵測引擎，精準計算 object-contain 的實際縮放座標
+        ui.previewCanvas.addEventListener('click', (e) => {
+            if (isGenerating || hitBoxes.length === 0) return;
+
+            const rect = ui.previewCanvas.getBoundingClientRect();
+            const canvasAspect = ui.previewCanvas.width / ui.previewCanvas.height;
+            const elementAspect = rect.width / rect.height;
+
+            let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+
+            // 計算因 object-contain 產生的內部黑邊偏移
+            if (canvasAspect > elementAspect) {
+                drawWidth = rect.width;
+                drawHeight = rect.width / canvasAspect;
+                offsetY = (rect.height - drawHeight) / 2;
+            } else {
+                drawHeight = rect.height;
+                drawWidth = rect.height * canvasAspect;
+                offsetX = (rect.width - drawWidth) / 2;
+            }
+
+            const scaleX = ui.previewCanvas.width / drawWidth;
+            const scaleY = ui.previewCanvas.height / drawHeight;
+
+            const clickX = (e.clientX - rect.left - offsetX) * scaleX;
+            const clickY = (e.clientY - rect.top - offsetY) * scaleY;
+
+            let changed = false;
+            // 反向遍歷，確保點擊到最上層的字元
+            for (let i = hitBoxes.length - 1; i >= 0; i--) {
+                const box = hitBoxes[i];
+                if (clickX >= box.x1 && clickX <= box.x2 && clickY >= box.y1 && clickY <= box.y2) {
+                    let effectiveMode = charModeOverrides.get(box.index) || currentMode;
+                    charModeOverrides.set(box.index, effectiveMode === 'decomp' ? 'mask' : 'decomp');
+                    changed = true;
+                    break;
+                }
+            }
+
+            if (changed) generateAnimation();
+        });
+
         function setMode(mode) {
             currentMode = mode;
+            charModeOverrides.clear(); // 💡 切換全域模式時，重置局部設定
             if (mode === 'decomp') {
                 ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
                 ui.modeMask.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
@@ -744,10 +801,12 @@
             }
         }
 
+        // 💡 修改：統一讓生成的遮罩切片以 (0,0) 為中心原點，方便與結構遮罩相容
         function generatePieces(width, height, numPieces) {
-            const cx = width / 2 + (Math.random() - 0.5) * width * 0.1;
-            const cy = height / 2 + (Math.random() - 0.5) * height * 0.1;
-            const r = Math.sqrt(width * width + height * height);
+            const cx = (Math.random() - 0.5) * width * 0.1;
+            const cy = (Math.random() - 0.5) * height * 0.1;
+            // 將半徑稍微放大，確保遮罩能完整覆蓋字元角落
+            const r = Math.sqrt(width * width + height * height) * 0.7; 
             const pieces = [];
             let startAngle = Math.random() * Math.PI * 2;
             for (let i = 0; i < numPieces; i++) {
@@ -789,6 +848,8 @@
             ctx.textBaseline = 'middle';
             ctx.textAlign = 'center';
 
+            let charAbsoluteIndex = 0; // 💡 新增：追蹤字元絕對索引
+
             for (let row = 0; row < lines.length; row++) {
                 const chars = Array.from(lines[row]);
                 const rowWidth = chars.length * spacing - tracking * scale;
@@ -796,6 +857,8 @@
                 
                 for (let col = 0; col < chars.length; col++) {
                     const char = chars[col];
+                    const currentCharIndex = charAbsoluteIndex++;
+
                     if (char.trim() === '') continue;
 
                     const charOffsetX = (Math.random() - 0.5) * charOffsetLevel * 1.5 * scale;
@@ -805,26 +868,57 @@
                     const charX = startX + col * spacing + charOffsetX;
                     const charY = padding + row * charSize + charSize / 2 + charOffsetY;
 
-                    let useMaskForThisChar = (currentMode === 'mask');
-                    let ast = null;
-                    let parts = [];
-
-                    if (!useMaskForThisChar) {
-                        ast = getASTForChar(char);
-                        if (needsMaskFallback(ast)) {
-                            useMaskForThisChar = true;
-                        } else {
-                            parts = layoutAST(ast, 0, 0, charSize * 0.85, charSize * 0.85, partGapRatio);
-                        }
+                    // 💡 新增：為 Frame 0 記錄可點擊的熱區
+                    if (f === 0) {
+                        hitBoxes.push({
+                            index: currentCharIndex,
+                            char: char,
+                            x1: charX - charSize / 2,
+                            y1: charY - charSize / 2,
+                            x2: charX + charSize / 2,
+                            y2: charY + charSize / 2
+                        });
                     }
 
+                    // 💡 決定此字元的最終渲染模式 (結合全域模式與點擊覆寫)
+                    let charEffectiveMode = charModeOverrides.get(currentCharIndex) || currentMode;
+                    let ast = getASTForChar(char);
+                    let useMaskForThisChar = (charEffectiveMode === 'mask') || needsMaskFallback(ast);
+
                     if (useMaskForThisChar) {
-                        const numPieces = Math.floor(Math.random() * 3) + 2;
-                        const pieces = generatePieces(charSize, charSize, numPieces);
+                        let pieces = [];
+                        
+                        // 💡 智能部首遮罩演算法：將 AST 結構轉化為撕裂紙張的 Clipping Path
+                        if (ast.op === 'leaf') {
+                            const numPieces = Math.floor(Math.random() * 3) + 2;
+                            pieces = generatePieces(charSize, charSize, numPieces);
+                        } else {
+                            // 使用些微負數的 gapRatio (-0.05) 讓部首遮罩稍微重疊，避免中間產生文字漏出的縫隙
+                            const maskParts = layoutAST(ast, 0, 0, charSize * 1.05, charSize * 1.05, -0.05);
+                            pieces = maskParts.map(part => {
+                                const p = new Path2D();
+                                const hw = part.w / 2;
+                                const hh = part.h / 2;
+                                const variance = charSize * 0.045; // 紙張邊緣撕裂幅度
+                                p.moveTo(part.x - hw, part.y - hh);
+                                createJaggedPath(p, part.x - hw, part.y - hh, part.x + hw, part.y - hh, 4, variance);
+                                createJaggedPath(p, part.x + hw, part.y - hh, part.x + hw, part.y + hh, 4, variance);
+                                createJaggedPath(p, part.x + hw, part.y + hh, part.x - hw, part.y + hh, 4, variance);
+                                createJaggedPath(p, part.x - hw, part.y + hh, part.x - hw, part.y - hh, 4, variance);
+                                p.closePath();
+                                return p;
+                            });
+                            
+                            // 若結構萃取失敗，安全降級回隨機碎塊
+                            if (pieces.length === 0) {
+                                const numPieces = Math.floor(Math.random() * 3) + 2;
+                                pieces = generatePieces(charSize, charSize, numPieces);
+                            }
+                        }
 
                         let bgIndices = [];
                         pieces.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
-                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * numPieces));
+                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * pieces.length));
 
                         pieces.forEach((piecePath, idx) => {
                             ctx.save();
@@ -841,9 +935,8 @@
                             }
 
                             ctx.save();
-                            ctx.translate(-charSize/2, -charSize/2);
+                            // 💡 移除原本舊的暴力平移，直接套用 0,0 基準點的智慧遮罩路徑
                             ctx.clip(piecePath);
-                            ctx.translate(charSize/2, charSize/2);
 
                             const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
                             ctx.font = `900 ${charSize * 0.8}px '${fontObj.family}'`;
@@ -853,16 +946,17 @@
 
                             if (hasBg) {
                                 ctx.save();
-                                ctx.translate(-charSize/2, -charSize/2);
                                 ctx.lineWidth = 1.5 * scale;
                                 ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
                                 ctx.stroke(piecePath);
                                 ctx.restore();
-                            }
+            }
                             ctx.restore();
                         });
 
                     } else {
+                        // 💡 部件重組 (Decomp) 正常渲染邏輯
+                        let parts = layoutAST(ast, 0, 0, charSize * 0.85, charSize * 0.85, partGapRatio);
                         const numParts = parts.length;
                         let bgIndices = [];
                         parts.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
@@ -926,6 +1020,7 @@
         async function generateAnimation() {
             if (isGenerating) return;
             isGenerating = true;
+            hitBoxes = []; // 💡 每次重新生成時清空熱區紀錄
             
             clearInterval(previewInterval);
             ui.exportActionGroup.classList.add('hidden');

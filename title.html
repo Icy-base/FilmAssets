@@ -7,8 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 載入多種風格的中英文字體 -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;500;900&family=Noto+Serif+TC:wght@300;700;900&family=Zhi+Mang+Xing&family=Ma+Shan+Zheng&family=Liu+Jian+Mao+Cao&family=Long+Cang&family=Klee+One:wght@400;600&family=Courier+Prime:wght@400;700&family=Montserrat:wght@400;900&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
-    <!-- 預先在 head 靜態載入 gifshot (更換為相容性最高的 jsDelivr) -->
-    <script src="https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js"></script>
     <style>
         /* 隱藏的預載區域，確保 Canvas 繪製前字體已被瀏覽器解析 */
         #font-preload { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden; }
@@ -40,7 +38,7 @@
         <div>
             <h1 class="text-xl font-black tracking-widest text-white flex items-center gap-2 uppercase">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-white"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" x2="8.12" y1="4" y2="15.88"/><line x1="14.47" x2="20" y1="14.48" y2="20"/><line x1="8.12" x2="12" y1="8.12" y2="12"/></svg>
-                Ransom Title
+                TILE TITLE
             </h1>
             <p class="text-[10px] text-neutral-500 mt-1 uppercase tracking-wider">拼貼風格標題文字產生器</p>
         </div>
@@ -52,7 +50,7 @@
                 <button id="modeDecomp" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm">部件重組 (新)</button>
                 <button id="modeMask" class="flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all">幾何遮罩 (舊)</button>
             </div>
-            <p id="modeDesc" class="text-[10px] text-neutral-500 leading-relaxed">將文字拆解為精細部件，進行非等比例拉伸。遇到英文或複雜字元時將保持獨立或安全降級，確保高辨識度與美感。</p>
+            <p id="modeDesc" class="text-[10px] text-neutral-500 leading-relaxed">將文字拆解為精細部件，進行非等比例拉伸。生成後點擊預覽畫面中的文字，可單獨切換該字的拼貼模式！</p>
         </div>
 
         <!-- 文字底色模式 -->
@@ -77,15 +75,15 @@
             
             <!-- 匯出解析度倍率 -->
             <div class="flex flex-col gap-1.5">
-                <label class="text-xs text-neutral-300 font-bold">匯出影片解析度 (MV 專用)</label>
+                <label class="text-xs text-neutral-300 font-bold">匯出影片解析度</label>
                 <select id="exportScaleInput" class="w-full bg-neutral-900 border border-neutral-800 p-2 rounded text-xs text-white focus:ring-1 focus:ring-white focus:outline-none cursor-pointer">
-                    <option value="1">網頁預覽標準畫質 (1x)</option>
+                    <option value="1">標準畫質 (1x)</option>
                     <option value="1.5">HD 畫質 (1.5x)</option>
-                    <option value="2">FHD 1080p 專業級 (2x)</option>
-                    <option value="3">2.5K 影視特效級 (3x)</option>
-                    <option value="4" selected>4K Ultra HD 頂級大師 (4x)</option>
+                    <option value="2">FHD 1080p (2x)</option>
+                    <option value="3">2.5K (3x)</option>
+                    <option value="4" selected>4K Ultra HD (4x)</option>
                 </select>
-                <p class="text-[10px] text-neutral-500 leading-relaxed">預覽時一律採用 1x 確保流暢，僅在「點擊匯出」時以高解析度無損渲染。GIF 格式最大支援 1080p (2x)。</p>
+                <p class="text-[10px] text-neutral-500 leading-relaxed">預覽時一律採用 1x 確保流暢，僅在「點擊匯出」時以高解析度無損渲染。</p>
             </div>
 
             <!-- 報紙模式開關 -->
@@ -190,15 +188,11 @@
                 載入素材與字體中...
             </button>
             
-            <!-- 雙排黑白簡約匯出按鈕區 -->
+            <!-- 匯出按鈕區 -->
             <div id="exportActionGroup" class="hidden flex-col gap-2">
-                <button id="exportBtn" class="w-full bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                <button id="exportBtn" class="w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
                     匯出透明 WebM 影片
-                </button>
-                <button id="exportGifBtn" class="w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                    匯出動圖 (優先 GIF / 備用 WebM)
                 </button>
             </div>
         </div>
@@ -206,22 +200,42 @@
 
     <!-- 右側預覽區 -->
     <div class="flex-1 relative flex flex-col items-center justify-center checker-bg p-4 md:p-8">
-        <div class="absolute top-4 right-4 bg-black/80 px-3 py-1.5 rounded text-[11px] text-neutral-400 border border-neutral-800 backdrop-blur-sm pointer-events-none uppercase tracking-wider">
-            Live Preview (Alpha Canvas)
-        </div>
-        <!-- 💡 新增：單點切換提示 -->
-        <div class="absolute top-14 right-4 bg-white/10 px-3 py-1.5 rounded text-[10px] text-white/80 border border-white/20 backdrop-blur-sm pointer-events-none">
-            🖱️ 點擊特定文字，可單獨切換 拆解/切割 模式
+        <div class="absolute top-4 right-4 bg-black/80 px-3 py-1.5 rounded text-[11px] text-neutral-400 border border-neutral-800 backdrop-blur-sm pointer-events-none uppercase tracking-wider z-10">
+            Live Preview (Click char to toggle mode)
         </div>
         <!-- 使用一個容器來限制 canvas 最大尺寸並保持比例 -->
-        <div class="max-w-full max-h-full flex items-center justify-center overflow-hidden rounded shadow-2xl ring-1 ring-white/5 bg-transparent">
-            <!-- 💡 新增：游標改為 pointer 提示可點擊 -->
-            <canvas id="previewCanvas" class="max-w-full max-h-[80vh] object-contain cursor-pointer transition-all hover:ring-2 hover:ring-white/30"></canvas>
+        <div class="max-w-full max-h-full flex items-center justify-center overflow-hidden rounded shadow-2xl ring-1 ring-white/5 bg-transparent relative z-10">
+            <!-- 加入 cursor-pointer 讓滑鼠移上去變手指 -->
+            <canvas id="previewCanvas" class="max-w-full max-h-[80vh] object-contain cursor-pointer"></canvas>
+        </div>
+
+        <!-- 右下角浮水印 LOGO -->
+        <div class="absolute bottom-6 right-6 opacity-35 pointer-events-none flex flex-col items-center z-0">
+            <svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680.37 542.12" class="w-[72px] h-auto">
+              <defs>
+                <style>
+                  .cls-1 {
+                    fill: #f2f2f2;
+                    stroke-width: 0px;
+                  }
+                </style>
+              </defs>
+              <g id="Layer_1-2" data-name="Layer 1">
+                <g>
+                  <polygon class="cls-1" points="325.88 542.12 0 542.12 0 42.24 504.6 42.24 504.6 308.77 502.6 308.77 502.6 44.24 2 44.24 2 540.12 325.88 540.12 325.88 542.12"/>
+                  <g>
+                    <polygon class="cls-1" points="89.04 141.76 89.04 453.27 .18 453.27 .18 94.25 89.04 141.76"/>
+                    <path class="cls-1" d="m320.89,352.5c-63.59,11.8-131.38-11.64-173.51-66.44-59.82-77.82-45.23-189.41,32.6-249.23,25.04-19.25,53.57-30.79,82.75-35.01,28.12-4.06,56.84-1.31,83.61,7.91,31.65,10.9,60.57,30.85,82.56,59.29l-70.47,54.17c-19.91-25.62-51.1-37.38-81.16-33.64-15.21,1.88-30.12,7.71-43.14,17.73-38.92,29.92-46.21,85.71-16.3,124.62,21.45,27.9,56.2,39.55,88.5,32.87l14.55,87.73Z"/>
+                    <path class="cls-1" d="m680.37,219.98c0,32.85-8.91,63.62-24.45,90.02h-.01l-10.19,15.44-51.77,78.4-19.85,30.07c-44.61,67.56-120.17,108.21-201.13,108.21h-48.05v-88.87h63.22c41.8,0,80.8-20.98,103.83-55.86h0c-78.66-4.66-143.54-60.47-161.87-134.63-3.38-13.7-5.18-28.03-5.18-42.78,0-27.78,6.37-54.07,17.73-77.49l78.52,41.98c-5.04,11.51-7.69,24.29-7.36,37.71,1.16,47.96,40.89,86.67,88.87,86.66,30.53,0,57.47-15.42,73.46-38.87.44-.64.88-1.29,1.29-1.95h.01c8.91-13.85,14.09-30.34,14.09-48.04,0-49.09-39.79-88.87-88.87-88.87V42.24c98.16,0,177.73,79.58,177.73,177.74Z"/>
+                  </g>
+                </g>
+              </g>
+            </svg>
+            <span class="text-[#f2f2f2] font-sans font-semibold text-[8px] tracking-[0.14em] pl-[0.14em] mt-2 whitespace-nowrap">Produce by Icy</span>
         </div>
     </div>
 
     <script>
-        // --- 設定與狀態 ---
         const fonts = [
             { family: 'Noto Sans TC', weights: [300, 500, 900] },
             { family: 'Noto Serif TC', weights: [300, 700, 900] },
@@ -237,60 +251,22 @@
 
         // 漢字偏旁與部首本地精確對照表，確保拆解準確
         const localDecomp = {
-            '跪': '⿰⿱口止危',
-            '下': '⿱一卜',
-            '求': '⿻氺丶',
-            '饒': '⿰飠堯',
-            '你': '⿰亻尔',
-            '我': '⿻𠂉找',
-            '他': '⿰亻也',
-            '們': '⿰亻門',
-            '好': '⿰女子',
-            '給': '⿰糹合',
-            '錢': '⿰金戔',
-            '死': '⿱歹匕',
-            '勒': '⿰革力',
-            '索': '⿱十冖糸',
-            '信': '⿰亻言',
-            '警': '⿱敬言',
-            '報': '⿰幸𠂤',
-            '告': '⿱⺧口',
-            '處': '⿸虍処',
-            '理': '⿰王里',
-            '辦': '⿲辛力辛',
-            '法': '⿰氵去',
-            '家': '⿱宀豕',
-            '世': '⿻廿凵',
-            '人': '人',
-            '口': '口',
-            '手': '手',
-            '天': '⿱一大',
-            '地': '⿰土也',
-            '風': '⿵几𠂡',
-            '格': '木',
-            '標': '木',
-            '題': '⿰是頁',
-            '產': '文',
-            '器': '⿱吅⿰⿱十口吅'
+            '跪': '⿰⿱口止危', '下': '⿱一卜', '求': '⿻氺丶', '饒': '⿰飠堯',
+            '你': '⿰亻尔', '我': '⿻𠂉找', '他': '⿰亻也', '們': '⿰亻門',
+            '好': '⿰女子', '給': '⿰糹合', '錢': '⿰金戔', '死': '⿱歹匕',
+            '勒': '⿰革力', '索': '⿱十冖糸', '信': '⿰亻言', '警': '⿱敬言',
+            '報': '⿰幸𠂤', '告': '⿱⺧口', '處': '⿸虍処', '理': '⿰王里',
+            '辦': '⿲辛力辛', '法': '⿰氵去', '家': '⿱宀豕', '世': '⿻廿凵',
+            '人': '人', '口': '口', '手': '手', '天': '⿱一大',
+            '地': '⿰土也', '風': '⿵几𠂡', '格': '木', '標': '木', '題': '⿰是頁',
+            '產': '文', '器': '⿱吅⿰⿱十口吅', '照': '⿱⿰日昭灬', '個': '⿰亻固',
+            '面': '面'
         };
 
-        // 取消過度替換的部首，保留原始部首形狀 (如 亻, 灬, 氵)，以維持文字高辨識度。
-        // 將其映射為自身，確保不會觸發幾何遮罩 (Mask) 降級模式。極少數罕見擴展字元則維持安全替換。
         const glyphOverrides = {
-            '𧾷': '足',
-            '飠': '飠',
-            '糹': '糹',
-            '亻': '亻',
-            '彳': '彳',
-            '氵': '氵',
-            '灬': '灬',
-            '犭': '犭',
-            '⻏': '阝',
-            '⻖': '阝',
-            '宀': '宀',
-            '辶': '辶',
-            '𦾏': '若',
-            '𡗗': '春'
+            '𧾷': '足', '飠': '飠', '糹': '糹', '亻': '亻', '彳': '彳',
+            '氵': '氵', '灬': '灬', '犭': '犭', '⻏': '阝', '⻖': '阝',
+            '宀': '宀', '辶': '辶', '𦾏': '若', '𡗗': '春'
         };
 
         let loadedBgImages = [];
@@ -300,12 +276,9 @@
         let currentMode = 'decomp'; 
         let textColorMode = 'black';
         let decompData = null; 
+        let charOverrides = {}; // 特殊指定單字模式 (charIndex -> 'decomp' | 'mask')
+        let charBoxes = [];     // 記錄每個文字在 Canvas 上的物理邊界供點擊檢測
 
-        // 💡 新增：用於記錄字元單獨的模式覆寫與點擊偵測的座標盒
-        let charModeOverrides = new Map();
-        let hitBoxes = [];
-
-        // --- DOM 元素 ---
         const ui = {
             modeDecomp: document.getElementById('modeDecomp'),
             modeMask: document.getElementById('modeMask'),
@@ -335,7 +308,6 @@
             generateBtn: document.getElementById('generateBtn'),
             exportActionGroup: document.getElementById('exportActionGroup'),
             exportBtn: document.getElementById('exportBtn'),
-            exportGifBtn: document.getElementById('exportGifBtn'),
             statusArea: document.getElementById('statusArea'),
             progressBar: document.getElementById('progressBar'),
             progressText: document.getElementById('progressText'),
@@ -344,7 +316,6 @@
             loadingIcon: document.getElementById('loadingIcon')
         };
 
-        // --- UI 事件綁定 ---
         ui.fpsInput.addEventListener('input', e => ui.fpsValue.innerText = e.target.value);
         ui.durationInput.addEventListener('input', e => ui.durationValue.innerText = e.target.value);
         ui.chaosInput.addEventListener('input', e => ui.chaosValue.innerText = e.target.value + '%');
@@ -356,71 +327,23 @@
         
         ui.generateBtn.addEventListener('click', generateAnimation);
         ui.exportBtn.addEventListener('click', exportVideo);
-        ui.exportGifBtn.addEventListener('click', exportGIF);
 
         ui.modeDecomp.addEventListener('click', () => setMode('decomp'));
         ui.modeMask.addEventListener('click', () => setMode('mask'));
         ui.colorModeBlack.addEventListener('click', () => setTextColorMode('black'));
         ui.colorModeWhite.addEventListener('click', () => setTextColorMode('white'));
 
-        // 💡 新增：當輸入文字改變時，清除所有局部模式覆寫設定
-        ui.textInput.addEventListener('input', () => {
-            charModeOverrides.clear();
-        });
-
-        // 💡 新增：Canvas 點擊偵測引擎，精準計算 object-contain 的實際縮放座標
-        ui.previewCanvas.addEventListener('click', (e) => {
-            if (isGenerating || hitBoxes.length === 0) return;
-
-            const rect = ui.previewCanvas.getBoundingClientRect();
-            const canvasAspect = ui.previewCanvas.width / ui.previewCanvas.height;
-            const elementAspect = rect.width / rect.height;
-
-            let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-
-            // 計算因 object-contain 產生的內部黑邊偏移
-            if (canvasAspect > elementAspect) {
-                drawWidth = rect.width;
-                drawHeight = rect.width / canvasAspect;
-                offsetY = (rect.height - drawHeight) / 2;
-            } else {
-                drawHeight = rect.height;
-                drawWidth = rect.height * canvasAspect;
-                offsetX = (rect.width - drawWidth) / 2;
-            }
-
-            const scaleX = ui.previewCanvas.width / drawWidth;
-            const scaleY = ui.previewCanvas.height / drawHeight;
-
-            const clickX = (e.clientX - rect.left - offsetX) * scaleX;
-            const clickY = (e.clientY - rect.top - offsetY) * scaleY;
-
-            let changed = false;
-            // 反向遍歷，確保點擊到最上層的字元
-            for (let i = hitBoxes.length - 1; i >= 0; i--) {
-                const box = hitBoxes[i];
-                if (clickX >= box.x1 && clickX <= box.x2 && clickY >= box.y1 && clickY <= box.y2) {
-                    let effectiveMode = charModeOverrides.get(box.index) || currentMode;
-                    charModeOverrides.set(box.index, effectiveMode === 'decomp' ? 'mask' : 'decomp');
-                    changed = true;
-                    break;
-                }
-            }
-
-            if (changed) generateAnimation();
-        });
-
         function setMode(mode) {
             currentMode = mode;
-            charModeOverrides.clear(); // 💡 切換全域模式時，重置局部設定
+            charOverrides = {}; // 切換全域模式時重置個體覆寫
             if (mode === 'decomp') {
                 ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
                 ui.modeMask.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
-                ui.modeDesc.innerText = '將文字拆解為精細部件，進行非等比例拉伸。遇到英文或複雜字元時將保持獨立或安全降級，確保高辨識度與美感。';
+                ui.modeDesc.innerText = '將文字拆解為精細部件，進行非等比例拉伸。生成後點擊預覽畫面中的文字，可單獨切換該字的拼貼模式！';
             } else {
                 ui.modeMask.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded bg-white text-black transition-all shadow-sm";
                 ui.modeDecomp.className = "flex-1 py-1.5 px-2 text-[11px] font-bold rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-all";
-                ui.modeDesc.innerText = '將文字用隨機多邊形切割成碎片，視覺上模擬手工剪紙效果。';
+                ui.modeDesc.innerText = '依據文字的部首與筆劃輪廓生成撕裂幾何遮罩。生成後點擊預覽畫面中的文字，可單獨切換該字的拼貼模式！';
             }
             if (!ui.generateBtn.disabled && !isGenerating) generateAnimation();
         }
@@ -439,55 +362,14 @@
             if (!ui.generateBtn.disabled && !isGenerating) generateAnimation();
         }
 
-        // --- 全自動以「輸入文字」當作匯出檔名的智慧命名器 ---
         function getCustomFileName(extension) {
             const rawText = ui.textInput.value || 'RansomTitle';
-            // 將多行替換為底線，移除非法字元與多餘空白
             let safeText = rawText.replace(/[\r\n]+/g, '_').replace(/[<>:"/\\|?*]+/g, '').replace(/\s+/g, '_');
-            safeText = safeText.substring(0, 15).replace(/_$/, ''); // 限制長度，保持檔名整潔
+            safeText = safeText.substring(0, 15).replace(/_$/, ''); 
             if (!safeText) safeText = 'RansomTitle';
             return `${safeText}.${extension}`;
         }
 
-        // --- 強悍的三層備援 GIF 載入引擎 ---
-        async function loadGifshot() {
-            if (window.gifshot) return true;
-            const cdns = [
-                'https://cdn.jsdelivr.net/npm/gifshot@0.4.5/build/gifshot.min.js',
-                'https://unpkg.com/gifshot@0.4.5/build/gifshot.min.js',
-                'https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.4.5/gifshot.min.js'
-            ];
-            for (const url of cdns) {
-                try {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = url;
-                        script.crossOrigin = 'anonymous';
-                        script.onload = () => setTimeout(resolve, 50); 
-                        script.onerror = reject;
-                        document.head.appendChild(script);
-                    });
-                    if (window.gifshot) return true;
-                } catch (e) {
-                    console.warn(`[策略1] 動態載入失敗: ${url}`);
-                }
-                try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        const code = await res.text();
-                        const script = document.createElement('script');
-                        script.textContent = code;
-                        document.head.appendChild(script);
-                        if (window.gifshot) return true;
-                    }
-                } catch(err) {
-                    console.warn(`[策略2] Fetch 備援失敗: ${url}`);
-                }
-            }
-            return !!window.gifshot;
-        }
-
-        // --- 初始化 (下載資源與部首偏旁) ---
         async function init() {
             const preloadDiv = document.getElementById('font-preload');
             fonts.forEach(f => {
@@ -530,11 +412,9 @@
                 })
                 .catch(e => ({}));
 
-            loadGifshot().catch(() => {});
-
             ui.statusArea.classList.remove('hidden');
             ui.statusArea.classList.add('flex');
-            ui.statusText.innerText = '正在下載字體、各式報章雜誌圖片與字典偏旁資料...';
+            ui.statusText.innerText = '正在下載字體、報章雜誌質感圖片與漢字部件字典...';
             ui.progressBar.style.width = '40%';
 
             const [_, bgResults, decompResults] = await Promise.all([fontLoadPromise, Promise.all(bgPromises), decompPromise]);
@@ -556,7 +436,6 @@
             generateAnimation();
         }
 
-        // --- IDS 漢字結構語法解析器 ---
         function parseIDS(str) {
             if (!str) return null;
             let index = 0;
@@ -801,12 +680,30 @@
             }
         }
 
-        // 💡 修改：統一讓生成的遮罩切片以 (0,0) 為中心原點，方便與結構遮罩相容
+        function generatePartMaskPath(partX, partY, partW, partH, scale) {
+            const p = new Path2D();
+            const pad = 12 * scale;
+            const hw = partW / 2 + pad;
+            const hh = partH / 2 + pad;
+            
+            const x1 = partX - hw;
+            const y1 = partY - hh;
+            const x2 = partX + hw;
+            const y2 = partY + hh;
+
+            p.moveTo(x1, y1);
+            createJaggedPath(p, x1, y1, x2, y1, 4, 8 * scale);
+            createJaggedPath(p, x2, y1, x2, y2, 4, 8 * scale);
+            createJaggedPath(p, x2, y2, x1, y2, 4, 8 * scale);
+            createJaggedPath(p, x1, y2, x1, y1, 4, 8 * scale);
+            p.closePath();
+            return p;
+        }
+
         function generatePieces(width, height, numPieces) {
-            const cx = (Math.random() - 0.5) * width * 0.1;
-            const cy = (Math.random() - 0.5) * height * 0.1;
-            // 將半徑稍微放大，確保遮罩能完整覆蓋字元角落
-            const r = Math.sqrt(width * width + height * height) * 0.7; 
+            const cx = width / 2 + (Math.random() - 0.5) * width * 0.1;
+            const cy = height / 2 + (Math.random() - 0.5) * height * 0.1;
+            const r = Math.sqrt(width * width + height * height);
             const pieces = [];
             let startAngle = Math.random() * Math.PI * 2;
             for (let i = 0; i < numPieces; i++) {
@@ -830,7 +727,6 @@
             return pieces;
         }
 
-        // --- 核心：無損多解析度渲染引擎 ---
         function renderFrameToContext(ctx, f, rawText, settings, scale) {
             const { currentMode, textColorMode, tracking, partGapRatio, bgProbability, isNewspaperMode, charOffsetLevel, chaosLevel, paddingFactor } = settings;
 
@@ -848,7 +744,9 @@
             ctx.textBaseline = 'middle';
             ctx.textAlign = 'center';
 
-            let charAbsoluteIndex = 0; // 💡 新增：追蹤字元絕對索引
+            if (f === 0) charBoxes = []; // 首影格記錄物理點擊框
+
+            let globalCharIndex = 0;
 
             for (let row = 0; row < lines.length; row++) {
                 const chars = Array.from(lines[row]);
@@ -857,9 +755,14 @@
                 
                 for (let col = 0; col < chars.length; col++) {
                     const char = chars[col];
-                    const currentCharIndex = charAbsoluteIndex++;
+                    if (char.trim() === '') {
+                        globalCharIndex++;
+                        continue;
+                    }
 
-                    if (char.trim() === '') continue;
+                    const charIndex = globalCharIndex++;
+                    // 優先採用個體覆寫模式，無指定則採用全域預設模式
+                    const activeCharMode = charOverrides[charIndex] || currentMode;
 
                     const charOffsetX = (Math.random() - 0.5) * charOffsetLevel * 1.5 * scale;
                     const charOffsetY = (Math.random() - 0.5) * charOffsetLevel * 1.5 * scale;
@@ -868,59 +771,48 @@
                     const charX = startX + col * spacing + charOffsetX;
                     const charY = padding + row * charSize + charSize / 2 + charOffsetY;
 
-                    // 💡 新增：為 Frame 0 記錄可點擊的熱區
                     if (f === 0) {
-                        hitBoxes.push({
-                            index: currentCharIndex,
-                            char: char,
-                            x1: charX - charSize / 2,
-                            y1: charY - charSize / 2,
-                            x2: charX + charSize / 2,
-                            y2: charY + charSize / 2
+                        charBoxes.push({
+                            index: charIndex,
+                            x: charX,
+                            y: charY,
+                            size: charSize,
+                            mode: activeCharMode
                         });
                     }
 
-                    // 💡 決定此字元的最終渲染模式 (結合全域模式與點擊覆寫)
-                    let charEffectiveMode = charModeOverrides.get(currentCharIndex) || currentMode;
+                    let useMaskForThisChar = (activeCharMode === 'mask');
                     let ast = getASTForChar(char);
-                    let useMaskForThisChar = (charEffectiveMode === 'mask') || needsMaskFallback(ast);
+                    let parts = layoutAST(ast, 0, 0, charSize * 0.85, charSize * 0.85, partGapRatio);
+
+                    if (!useMaskForThisChar && needsMaskFallback(ast)) {
+                        useMaskForThisChar = true;
+                    }
 
                     if (useMaskForThisChar) {
-                        let pieces = [];
-                        
-                        // 💡 智能部首遮罩演算法：將 AST 結構轉化為撕裂紙張的 Clipping Path
-                        if (ast.op === 'leaf') {
-                            const numPieces = Math.floor(Math.random() * 3) + 2;
-                            pieces = generatePieces(charSize, charSize, numPieces);
-                        } else {
-                            // 使用些微負數的 gapRatio (-0.05) 讓部首遮罩稍微重疊，避免中間產生文字漏出的縫隙
-                            const maskParts = layoutAST(ast, 0, 0, charSize * 1.05, charSize * 1.05, -0.05);
-                            pieces = maskParts.map(part => {
-                                const p = new Path2D();
-                                const hw = part.w / 2;
-                                const hh = part.h / 2;
-                                const variance = charSize * 0.045; // 紙張邊緣撕裂幅度
-                                p.moveTo(part.x - hw, part.y - hh);
-                                createJaggedPath(p, part.x - hw, part.y - hh, part.x + hw, part.y - hh, 4, variance);
-                                createJaggedPath(p, part.x + hw, part.y - hh, part.x + hw, part.y + hh, 4, variance);
-                                createJaggedPath(p, part.x + hw, part.y + hh, part.x - hw, part.y + hh, 4, variance);
-                                createJaggedPath(p, part.x - hw, part.y + hh, part.x - hw, part.y - hh, 4, variance);
-                                p.closePath();
-                                return p;
+                        // 智能幾何遮罩：若字能拆出零件（如「照」拆為日、刀、口、灬），則依零件輪廓切割，否則隨機切割
+                        let pieceMasks = [];
+                        if (parts && parts.length > 1) {
+                            parts.forEach(part => {
+                                pieceMasks.push({
+                                    path: generatePartMaskPath(part.x, part.y, part.w, part.h, scale),
+                                    w: part.w,
+                                    h: part.h,
+                                    x: part.x,
+                                    y: part.y
+                                });
                             });
-                            
-                            // 若結構萃取失敗，安全降級回隨機碎塊
-                            if (pieces.length === 0) {
-                                const numPieces = Math.floor(Math.random() * 3) + 2;
-                                pieces = generatePieces(charSize, charSize, numPieces);
-                            }
+                        } else {
+                            const numPieces = Math.floor(Math.random() * 3) + 2;
+                            const pieces = generatePieces(charSize, charSize, numPieces);
+                            pieces.forEach(p => pieceMasks.push({ path: p, w: charSize * 0.7, h: charSize * 0.7, x: 0, y: 0 }));
                         }
 
                         let bgIndices = [];
-                        pieces.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
-                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * pieces.length));
+                        pieceMasks.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
+                        if (bgProbability > 0 && bgIndices.length === 0) bgIndices.push(Math.floor(Math.random() * pieceMasks.length));
 
-                        pieces.forEach((piecePath, idx) => {
+                        pieceMasks.forEach((pieceObj, idx) => {
                             ctx.save();
                             ctx.translate(charX, charY);
                             ctx.rotate(charAngleOffset);
@@ -931,12 +823,11 @@
                             const hasBg = bgIndices.includes(idx);
                             if (hasBg && loadedBgImages.length > 0) {
                                 const bgImg = loadedBgImages[Math.floor(Math.random() * loadedBgImages.length)];
-                                drawRansomCard(ctx, 0, 0, charSize * 0.7, charSize * 0.7, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode);
+                                drawRansomCard(ctx, pieceObj.x, pieceObj.y, pieceObj.w, pieceObj.h, bgImg, paddingFactor, isNewspaperMode, scale, textColorMode);
                             }
 
                             ctx.save();
-                            // 💡 移除原本舊的暴力平移，直接套用 0,0 基準點的智慧遮罩路徑
-                            ctx.clip(piecePath);
+                            ctx.clip(pieceObj.path);
 
                             const fontObj = fonts[Math.floor(Math.random() * fonts.length)];
                             ctx.font = `900 ${charSize * 0.8}px '${fontObj.family}'`;
@@ -945,18 +836,15 @@
                             ctx.restore();
 
                             if (hasBg) {
-                                ctx.save();
                                 ctx.lineWidth = 1.5 * scale;
                                 ctx.strokeStyle = textColorMode === 'white' ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.15)';
-                                ctx.stroke(piecePath);
-                                ctx.restore();
-            }
+                                ctx.stroke(pieceObj.path);
+                            }
                             ctx.restore();
                         });
 
                     } else {
-                        // 💡 部件重組 (Decomp) 正常渲染邏輯
-                        let parts = layoutAST(ast, 0, 0, charSize * 0.85, charSize * 0.85, partGapRatio);
+                        // 部件重組模式
                         const numParts = parts.length;
                         let bgIndices = [];
                         parts.forEach((_, idx) => { if (Math.random() < bgProbability) bgIndices.push(idx); });
@@ -1020,7 +908,6 @@
         async function generateAnimation() {
             if (isGenerating) return;
             isGenerating = true;
-            hitBoxes = []; // 💡 每次重新生成時清空熱區紀錄
             
             clearInterval(previewInterval);
             ui.exportActionGroup.classList.add('hidden');
@@ -1091,7 +978,7 @@
             ui.statusArea.classList.remove('flex');
             ui.statusArea.classList.add('hidden');
             ui.generateBtn.disabled = false;
-            ui.generateBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg hover:shadow-white/10 flex items-center justify-center gap-2";
+            ui.generateBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg flex items-center justify-center gap-2";
             ui.generateBtn.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 重新產生
@@ -1115,192 +1002,35 @@
             }, 1000 / fps);
         }
 
-        function dataURLtoBlob(dataurl) {
-            var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1],
-                bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
-            while(n--){ u8arr[n] = bstr.charCodeAt(n); }
-            return new Blob([u8arr], {type:mime});
-        }
+        // 點擊 Canvas 上特定文字，獨立切換該字的拼貼模式 (Decomposition <-> Mask)
+        ui.previewCanvas.addEventListener('click', e => {
+            if (charBoxes.length === 0 || isGenerating) return;
+            const rect = ui.previewCanvas.getBoundingClientRect();
+            const scaleX = ui.previewCanvas.width / rect.width;
+            const scaleY = ui.previewCanvas.height / rect.height;
+            const clickX = (e.clientX - rect.left) * scaleX;
+            const clickY = (e.clientY - rect.top) * scaleY;
 
-        // --- 智慧 GIF 匯出與降級備援機制 ---
-        async function exportGIF() {
-            if (precomputedFrames.length === 0) return;
-
-            const webmBtn = ui.exportBtn;
-            const gifBtn = ui.exportGifBtn;
-            const originalGifText = gifBtn.innerHTML;
-
-            webmBtn.disabled = true;
-            gifBtn.disabled = true;
-            gifBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
-            gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 載入 GIF 引擎中...`;
-
-            const gifshotLoaded = await loadGifshot();
-            
-            // 🚨 自動備援降級機制：當偵測到環境不允許 GIF 引擎執行時，自動為使用者匯出透明 WebM！
-            if (!gifshotLoaded) {
-                ui.statusArea.classList.remove('hidden');
-                ui.statusArea.classList.add('flex');
-                ui.statusText.innerText = '⚠️ 平台安全限制阻擋了 GIF 引擎。正為您自動匯出更高畫質的透明 WebM！(可至 ezgif.com 秒轉為 GIF)';
-                ui.progressBar.className = 'bg-yellow-500 h-full w-full transition-all';
-                ui.progressText.innerText = '自動備援';
-                
-                webmBtn.disabled = false;
-                gifBtn.disabled = false;
-                gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
-                gifBtn.innerHTML = originalGifText;
-                
-                // 自動導向完美的 WebM 匯出處理
-                setTimeout(() => {
-                    ui.statusArea.classList.add('hidden');
-                    exportVideo();
-                }, 2000);
-                return;
+            for (const box of charBoxes) {
+                if (clickX >= box.x - box.size/2 && clickX <= box.x + box.size/2 &&
+                    clickY >= box.y - box.size/2 && clickY <= box.y + box.size/2) {
+                    
+                    const nextMode = (box.mode === 'mask') ? 'decomp' : 'mask';
+                    charOverrides[box.index] = nextMode;
+                    generateAnimation(); // 觸發重繪
+                    break;
+                }
             }
+        });
 
-            ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200";
-            gifBtn.innerHTML = `<svg class="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 影格高精渲染中...`;
-
-            const rawText = ui.textInput.value || '請輸入文字';
-            const fps = parseInt(ui.fpsInput.value);
-            const duration = parseInt(ui.durationInput.value);
-            const totalFrames = fps * duration;
-
-            let chosenScale = parseFloat(ui.exportScaleInput.value);
-            if (chosenScale > 2.0) chosenScale = 2.0; 
-
-            const settings = {
-                currentMode, textColorMode, 
-                tracking: parseInt(ui.trackingInput.value),
-                partGapRatio: parseInt(ui.partGapInput.value) / 100,
-                bgProbability: parseInt(ui.bgChanceInput.value) / 100,
-                isNewspaperMode: ui.newspaperModeToggle.checked,
-                charOffsetLevel: parseInt(ui.charOffsetInput.value),
-                chaosLevel: parseInt(ui.chaosInput.value) / 100,
-                paddingFactor: parseInt(ui.bgPaddingInput.value) / 100
-            };
-
-            const lines = rawText.split('\n');
-            let maxCols = 0;
-            lines.forEach(l => maxCols = Math.max(maxCols, Array.from(l).length));
-            if (maxCols === 0) maxCols = 1;
-
-            const charSize = 260; 
-            const padding = 60;
-            const spacing = charSize + settings.tracking;
-            const baseWidth = maxCols * spacing - settings.tracking + padding * 2;
-            const baseHeight = lines.length * charSize + padding * 2;
-
-            const finalW = baseWidth * chosenScale;
-            const finalH = baseHeight * chosenScale;
-
-            ui.statusArea.classList.remove('hidden');
-            ui.statusArea.classList.add('flex');
-            ui.statusText.innerText = '正在生成高精度 GIF 影格...';
-            ui.progressBar.style.width = '0%';
-            ui.progressText.innerText = '0%';
-
-            const gifFramesDataURLs = [];
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = finalW;
-            tempCanvas.height = finalH;
-            const tempCtx = tempCanvas.getContext('2d');
-
-            for (let i = 0; i < totalFrames; i++) {
-                tempCtx.clearRect(0, 0, finalW, finalH);
-                renderFrameToContext(tempCtx, i, rawText, settings, chosenScale);
-                
-                try {
-                    gifFramesDataURLs.push(tempCanvas.toDataURL('image/png'));
-                } catch (e) {
-                    ui.statusArea.classList.remove('hidden');
-                    ui.statusArea.classList.add('flex');
-                    ui.statusText.innerText = '背景圖片遇到嚴格跨域安全限制 (CORS)，無法匯出。正為您自動降級匯出無背景素材的 WebM！';
-                    ui.progressBar.className = 'bg-yellow-500 h-full w-full transition-all';
-                    ui.progressText.innerText = '自動備援';
-                    
-                    webmBtn.disabled = false;
-                    gifBtn.disabled = false;
-                    gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
-                    gifBtn.innerHTML = originalGifText;
-                    
-                    setTimeout(() => {
-                        ui.statusArea.classList.add('hidden');
-                        exportVideo();
-                    }, 2000);
-                    return;
-                }
-
-                const percent = Math.round(((i + 1) / totalFrames) * 40); 
-                ui.progressBar.style.width = `${percent}%`;
-                ui.progressText.innerText = `${percent}%`;
-                if (i % 3 === 0) await new Promise(r => setTimeout(r, 0));
-            }
-
-            ui.statusText.innerText = '多執行緒透明 GIF 去背編碼中...';
-
-            gifshot.createGIF({
-                images: gifFramesDataURLs,
-                gifWidth: finalW,
-                gifHeight: finalH,
-                interval: 1 / fps,
-                numFrames: totalFrames,
-                transparent: true, 
-                numWorkers: 0,     
-                progress: function(percent) {
-                    const totalPercent = Math.round(40 + percent * 60);
-                    ui.progressBar.style.width = `${totalPercent}%`;
-                    ui.progressText.innerText = `${totalPercent}%`;
-                }
-            }, function(obj) {
-                ui.statusArea.classList.add('hidden');
-
-                if (!obj.error) {
-                    const blob = dataURLtoBlob(obj.image);
-                    const url = URL.createObjectURL(blob);
-                    
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = getCustomFileName('gif'); // 💡 使用自訂檔名
-                    document.body.appendChild(a);
-                    a.click();
-                    
-                    setTimeout(() => {
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    }, 500);
-                } else {
-                    console.error("GIF generation failed:", obj.error);
-                    ui.statusArea.classList.remove('hidden');
-                    ui.statusArea.classList.add('flex');
-                    ui.statusText.innerText = `GIF 匯出出錯。正為您自動備援匯出 WebM！`;
-                    ui.progressBar.className = 'bg-yellow-500 h-full w-full';
-                    
-                    setTimeout(() => {
-                        ui.statusArea.classList.add('hidden');
-                        exportVideo();
-                    }, 2000);
-                }
-
-                webmBtn.disabled = false;
-                gifBtn.disabled = false;
-                gifBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
-                gifBtn.innerHTML = originalGifText;
-            });
-        }
-
-        // --- 匯出帶有透明通道的 WebM 影片 ---
         async function exportVideo() {
             if (precomputedFrames.length === 0) return;
             
             const webmBtn = ui.exportBtn;
-            const gifBtn = ui.exportGifBtn;
             const originalContent = webmBtn.innerHTML;
             
             webmBtn.disabled = true;
-            gifBtn.disabled = true;
-            webmBtn.className = "w-full bg-neutral-900 text-neutral-500 py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
+            webmBtn.className = "w-full bg-neutral-900 text-neutral-500 py-3 rounded text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-wait";
             webmBtn.innerHTML = `<svg class="animate-spin mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> WebM 高畫質編碼中...`;
 
             const rawText = ui.textInput.value || '請輸入文字';
@@ -1339,7 +1069,7 @@
             let mimeType = 'video/webm; codecs=vp9';
             if (!MediaRecorder.isTypeSupported(mimeType)) {
                 mimeType = 'video/webm; codecs=vp8';
-                console.warn('瀏覽器不支援 VP9 透明編碼，自動使用 VP8。');
+                console.warn('瀏覽器不支援 VP9 透明編碼，自動降級為 VP8。');
             }
 
             const stream = recordCanvas.captureStream(fps);
@@ -1361,7 +1091,7 @@
 
             ui.statusArea.classList.remove('hidden');
             ui.statusArea.classList.add('flex');
-            ui.statusText.innerText = '正在生成高畫質 WebM 影格...';
+            ui.statusText.innerText = '正在生成高畫質無損 WebM 影格...';
             ui.progressBar.className = "bg-white h-full w-0 transition-all duration-200";
 
             for (let i = 0; i < totalFrames; i++) {
@@ -1384,7 +1114,7 @@
             const a = document.createElement('a');
             a.style.display = 'none';
             a.href = url;
-            a.download = getCustomFileName('webm'); // 💡 使用自訂檔名
+            a.download = getCustomFileName('webm'); // 使用輸入文字自動命名
             document.body.appendChild(a);
             a.click();
             
@@ -1392,8 +1122,7 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 webmBtn.disabled = false;
-                gifBtn.disabled = false;
-                webmBtn.className = "w-full bg-neutral-800 hover:bg-neutral-700 text-white py-2.5 rounded text-xs font-bold transition-all flex items-center justify-center gap-2";
+                webmBtn.className = "w-full bg-white hover:bg-neutral-200 text-black py-3 rounded font-bold transition-all shadow-lg flex items-center justify-center gap-2";
                 webmBtn.innerHTML = originalContent;
             }, 500);
         }
